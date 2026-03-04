@@ -1,0 +1,9 @@
+node_modules/
+.DS_Store
+.env
+*.log
+.vscode/
+dist/
+build/
+pan_search_fast.py
+hero_bg.png
