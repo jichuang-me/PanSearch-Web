@@ -732,18 +732,6 @@ function renderCards(list) {
                 ` : ''}
             </div>`;
     }).join('');
-
-    // Seamless Infinite Scroll for all groups
-    document.querySelectorAll('.show-more-btn').forEach(btn => {
-        const observer = new IntersectionObserver((entries) => {
-            if (entries[0].isIntersecting) {
-                observer.disconnect();
-                const gid = btn.id.replace('-b', '');
-                toggleGroup(gid);
-            }
-        }, { rootMargin: '400px' });
-        observer.observe(btn);
-    });
 }
 
 function renderSingleCard(item, idx) {
