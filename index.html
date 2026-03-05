@@ -51,18 +51,29 @@
                 </div>
             </div>
 
-            <!-- Discovery (latest only, now full width) -->
-            <div id="discovery" class="discovery">
-                <div class="disc-section full-width">
-                    <h3>✨ 最新资源 <span class="live">LIVE</span></h3>
-                    <div class="disc-tabs">
-                        <button class="disc-tab active" data-cat="all">推荐</button>
-                        <button class="disc-tab" data-cat="movie">影视</button>
-                        <button class="disc-tab" data-cat="music">音乐</button>
-                        <button class="disc-tab" data-cat="software">软件</button>
-                        <button class="disc-tab" data-cat="doc">资料</button>
+            <!-- Discovery (Multi-column layout) -->
+            <div id="discovery" class="discovery-grid">
+                <div class="disc-col">
+                    <h3>🎬 影视动态</h3>
+                    <div id="list-movie" class="latest-list">
+                        <div class="loading-spinner mini"></div>
                     </div>
-                    <div id="latest-list" class="latest-list">
+                </div>
+                <div class="disc-col">
+                    <h3>🎵 音乐资源</h3>
+                    <div id="list-music" class="latest-list">
+                        <div class="loading-spinner mini"></div>
+                    </div>
+                </div>
+                <div class="disc-col">
+                    <h3>💻 软件工具</h3>
+                    <div id="list-software" class="latest-list">
+                        <div class="loading-spinner mini"></div>
+                    </div>
+                </div>
+                <div class="disc-col">
+                    <h3>📚 学习资料</h3>
+                    <div id="list-doc" class="latest-list">
                         <div class="loading-spinner mini"></div>
                     </div>
                 </div>

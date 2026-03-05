@@ -13,19 +13,16 @@ const HOT_KEYWORDS = [
     '编程入门', '考研资料', '雅思托福', 'AI教程', '设计素材'
 ];
 
-// Mapping for categories to keywords or specific search logic if needed
-const CAT_MAP = {
-    'all': '',
-    'movie': '影视',
-    'music': '音乐',
-    'software': '软件',
-    'doc': '资料'
-};
+const DISCOVERY_CATS = [
+    { id: 'movie', label: '🎬 影视', kw: '影视' },
+    { id: 'music', label: '🎵 音乐', kw: '音乐' },
+    { id: 'software', label: '💻 软件', kw: '软件' },
+    { id: 'doc', label: '📚 学习', kw: '资料' }
+];
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let allResults = [];
 let activeType = 'all';
-let activeCat = 'all';
 let isSearching = false;
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
@@ -42,7 +39,6 @@ const backBtn = $('back-btn');
 const resultsGrid = $('results-grid');
 const resultInfo = $('result-info');
 const hotTagsEl = $('hot-tags');
-const latestListEl = $('latest-list');
 
 async function fetchWithProxy(url) {
     const encodedUrl = encodeURIComponent(url);
@@ -80,7 +76,6 @@ function bindEvents() {
     if (resultsInput) resultsInput.onkeydown = e => e.key === 'Enter' && handleSearch();
     if (backBtn) backBtn.onclick = showSearch;
 
-    // Type Filters
     document.querySelectorAll('.type-filter .tag').forEach(tag => {
         tag.onclick = () => {
             const type = tag.dataset.type;
@@ -89,68 +84,49 @@ function bindEvents() {
             renderCards(allResults);
         };
     });
-
-    // Discovery Category Tabs
-    document.querySelectorAll('.disc-tab').forEach(tab => {
-        tab.onclick = () => {
-            if (isSearching) return;
-            const cat = tab.dataset.cat;
-            document.querySelectorAll('.disc-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === cat));
-            activeCat = cat;
-            loadLatestByCategory(cat);
-        };
-    });
 }
 
-// ─── DISCOVERY (HOT + LATEST) ───────────────────────────────────────────────
+// ─── DISCOVERY (GRID LAYOUT) ────────────────────────────────────────────────
 async function loadDiscovery() {
     if (hotTagsEl) {
         hotTagsEl.innerHTML = HOT_KEYWORDS.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${k}</span>`).join('');
     }
-    loadLatestByCategory('all');
+
+    // Process each category in parallel
+    DISCOVERY_CATS.forEach(cat => fetchAndRenderCol(cat));
 }
 
-async function loadLatestByCategory(cat) {
-    if (latestListEl) latestListEl.innerHTML = '<div class="loading-spinner mini"></div>';
+async function fetchAndRenderCol(cat) {
+    const el = $(`list-${cat.id}`);
+    if (!el) return;
 
     try {
-        // Try backend first if local
-        if (window.location.protocol !== 'https:') {
-            const data = await tryFetchBackend('latest');
-            if (data && data.code === 0 && cat === 'all') {
-                renderLatest(data.data);
-                return;
-            }
-        }
-
-        // Serverless Scraping
-        const kw = CAT_MAP[cat] || '';
-        const url = kw ? `https://www.pansearch.me/search?keyword=${encodeURIComponent(kw)}` : 'https://www.pansearch.me/';
+        const url = `https://www.pansearch.me/search?keyword=${encodeURIComponent(cat.kw)}`;
         const html = await fetchWithProxy(url);
 
         if (html) {
-            const items = parsePanSearchHtml(html);
-            renderLatest(items.slice(0, 12));
+            const items = parsePanSearchHtml(html).slice(0, 8);
+            renderColumnList(el, items);
         } else {
-            throw new Error("Proxy failed");
+            throw new Error("Fetch failed");
         }
     } catch (e) {
-        if (latestListEl) latestListEl.innerHTML = '<div class="empty-state" style="padding:20px"><p>加载失败，请重试</p></div>';
+        el.innerHTML = '<div class="empty-state" style="padding:10px;font-size:0.8rem">暂时无法连接</div>';
     }
 }
 
-function renderLatest(items) {
-    if (!latestListEl) return;
+function renderColumnList(container, items) {
     if (!items || !items.length) {
-        latestListEl.innerHTML = '<div class="empty-state" style="padding:20px"><p>暂无此类资源</p></div>';
+        container.innerHTML = '<div class="empty-state" style="padding:10px;font-size:0.8rem">暂无资源</div>';
         return;
     }
-    latestListEl.innerHTML = items.map(item => {
-        const dotClass = `dot-${item.driveType}` in { 'dot-quark': 1, 'dot-baidu': 1, 'dot-aliyun': 1, 'dot-uc': 1, 'dot-xunlei': 1, 'dot-mobile': 1, 'dot-telecom': 1, 'dot-pikpak': 1 } ? `dot-${item.driveType}` : 'dot-default';
+    container.innerHTML = items.map(item => {
+        const driveKey = item.driveType in { 'quark': 1, 'baidu': 1, 'aliyun': 1, 'uc': 1, 'xunlei': 1, 'mobile': 1, 'telecom': 1, 'pikpak': 1 } ? item.driveType : 'default';
+        const dotClass = `dot-${driveKey}`;
         return `<div class="latest-item" onclick="doSearch('${escAttr(item.note)}')">
             <span class="type-dot ${dotClass}"></span>
             <span class="latest-item-name">${escHtml(item.note)}</span>
-            <span class="latest-item-meta">${item.datetime ? item.datetime.split('T')[0] : ''}</span>
+            <span class="latest-item-meta">${item.datetime ? item.datetime.split('T')[0].slice(5) : ''}</span>
         </div>`;
     }).join('');
 }
@@ -164,7 +140,7 @@ async function doSearch(keyword) {
     if (resultsInput) resultsInput.value = keyword;
 
     showResults();
-    if (resultInfo) resultInfo.textContent = `正在全网聚合搜索 "${keyword}"…`;
+    if (resultInfo) resultInfo.textContent = `正在聚合搜索 "${keyword}"…`;
     setSearchLoading(true);
 
     try {
@@ -184,8 +160,8 @@ async function doSearch(keyword) {
             }
         }
     } catch (e) {
-        toast('请检查网络连接', 'error');
-        if (resultInfo) resultInfo.textContent = `由于网络波动，搜索中断`;
+        toast('搜索中断，请稍后重试', 'error');
+        if (resultInfo) resultInfo.textContent = `网络异常，搜索失败`;
         renderCards([]);
     } finally {
         isSearching = false;
@@ -219,12 +195,8 @@ async function serverlessSearch(keyword) {
     } catch (e) { return null; }
 }
 
-/**
- * Enhanced Scraper: Multi-drive support including Mobile, Telecom, and Foreign drives.
- */
 function parsePanSearchHtml(html) {
     const items = [];
-    // Expanded patterns for various drives
     const driveRegex = /href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|www\.aliyundrive\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn|yun\.139\.com|cloud\.189\.cn|pan\.wo\.cn|115\.com|mypikpak\.com)\/s\/[a-zA-Z0-9_\-]+)"/gi;
 
     let match;
@@ -255,7 +227,7 @@ function parsePanSearchHtml(html) {
         else if (url.includes('xunlei')) driveType = 'xunlei';
         else if (url.includes('139.com')) driveType = 'mobile';
         else if (url.includes('189.cn')) driveType = 'telecom';
-        else if (url.includes('wo.cn')) driveType = 'telecom'; // Unicom treated as telecom for simplicity or shared styles
+        else if (url.includes('wo.cn')) driveType = 'telecom';
         else if (url.includes('pikpak')) driveType = 'pikpak';
         else if (url.includes('115.com')) driveType = '115';
 
@@ -275,7 +247,7 @@ function renderCards(list) {
     const filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
 
     if (!filtered.length) {
-        resultsGrid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>换个关键词，或者切换网盘分类看看？</p></div>`;
+        resultsGrid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>换个关键词试试？</p></div>`;
         return;
     }
 
@@ -314,7 +286,7 @@ function setSearchLoading(on) {
     if (on) {
         resultsGrid.innerHTML = `<div class="loading-state">
             <div class="loading-spinner"></div>
-            <p>正在聚合搜索最优质的资源，请稍候...</p>
+            <p>正在拼命聚合全网资源，请稍候...</p>
         </div>`;
     }
 }
