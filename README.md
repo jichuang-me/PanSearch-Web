@@ -9,14 +9,6 @@ PanSearch-Web 是一个基于 Node.js 的全栈搜索应用，整合了多渠道
 - **全栈合体**：单一服务同时提供 API 指向和静态页面托管。
 - **移动适配**：精致的 UI 设计，支持手机、平板、电脑多端访问。
 
-## 🌍 点击一键发布 (Deploy)
-
-点击下方的按钮，即可将本项目部署到 Vercel 云平台，获得您的专属公开分享链接：
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/jichuang-me/PanSearch-Web)
-
----
-
 ## 🛠️ 本地运行
 
 如果您想在本地运行：
