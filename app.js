@@ -10,7 +10,7 @@ const BACKEND_URL = (window.location.protocol === 'file:')
 
 const PROXIES = [
     'https://api.allorigins.win/get?url=',
-    'https://cors-anywhere.azm.workers.dev/'
+    'https://corsproxy.io/?'
 ];
 
 const HOT_KEYWORDS = [
@@ -40,19 +40,26 @@ const hotTagsEl = $('hot-tags');
 const latestListEl = $('latest-list');
 
 async function fetchWithProxy(url) {
+    // Round-robin or fallback proxy
+    const encodedUrl = encodeURIComponent(url);
+    const timestamp = Date.now();
+
+    // Try AllOrigins (reliable but wrapped in JSON)
     try {
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`;
-        const res = await fetch(proxyUrl);
-        const json = await res.json();
-        return json.contents;
-    } catch (e) {
-        try {
-            const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-            return await res.text();
-        } catch (e2) {
-            return null;
+        const res = await fetch(`https://api.allorigins.win/get?url=${encodedUrl}&_=${timestamp}`);
+        if (res.ok) {
+            const json = await res.json();
+            if (json.contents) return json.contents;
         }
-    }
+    } catch (e) { }
+
+    // Fallback to CorsProxy.io (direct text result)
+    try {
+        const res = await fetch(`https://corsproxy.io/?${encodedUrl}`);
+        if (res.ok) return await res.text();
+    } catch (e) { }
+
+    return null;
 }
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
@@ -63,19 +70,22 @@ async function fetchWithProxy(url) {
 })();
 
 function bindEvents() {
-    if (searchBtn) searchBtn.onclick = () => doSearch(searchInput.value.trim());
-    if (searchInput) searchInput.onkeydown = e => e.key === 'Enter' && doSearch(searchInput.value.trim());
-    if (resultsSearchBtn) resultsSearchBtn.onclick = () => doSearch(resultsInput.value.trim());
-    if (resultsInput) resultsInput.onkeydown = e => e.key === 'Enter' && doSearch(resultsInput.value.trim());
+    const handleSearch = () => {
+        const val = (viewResults.classList.contains('active') ? resultsInput : searchInput).value.trim();
+        if (val) doSearch(val);
+    };
+
+    if (searchBtn) searchBtn.onclick = handleSearch;
+    if (searchInput) searchInput.onkeydown = e => e.key === 'Enter' && handleSearch();
+    if (resultsSearchBtn) resultsSearchBtn.onclick = handleSearch;
+    if (resultsInput) resultsInput.onkeydown = e => e.key === 'Enter' && handleSearch();
     if (backBtn) backBtn.onclick = showSearch;
 
     document.querySelectorAll('.type-filter .tag').forEach(tag => {
         tag.onclick = () => {
             const type = tag.dataset.type;
-            document.querySelectorAll('.type-filter').forEach(container => {
-                container.querySelectorAll('.tag').forEach(t => {
-                    t.classList.toggle('active', t.dataset.type === type);
-                });
+            document.querySelectorAll('.type-filter .tag').forEach(t => {
+                t.classList.toggle('active', t.dataset.type === type);
             });
             activeType = type;
             renderCards(allResults);
@@ -90,12 +100,8 @@ async function loadDiscovery() {
     }
 
     try {
-        // 1. Try backend
         let data = await tryFetchBackend('latest');
-
-        // 2. Try serverless if backend fails
         if (!data || data.code !== 0) {
-            console.log("[Discovery] Backend failed, switching to Serverless mode...");
             data = await serverlessDiscovery();
         }
 
@@ -105,7 +111,7 @@ async function loadDiscovery() {
             if (latestListEl) latestListEl.innerHTML = '<div class="latest-item" style="color:var(--muted);font-size:.8rem">欢迎使用！输入关键词开始搜索</div>';
         }
     } catch (e) {
-        if (latestListEl) latestListEl.innerHTML = '<div class="latest-item" style="color:var(--muted);font-size:.8rem">初始化完成，准备就绪</div>';
+        console.error("[Discovery] Error", e);
     }
 }
 
@@ -113,35 +119,8 @@ async function serverlessDiscovery() {
     try {
         const html = await fetchWithProxy('https://www.pansearch.me/');
         if (!html) return null;
-
-        const items = [];
-        const regex = /<div class="card-body">([\s\S]*?)<\/div>/g;
-        let match;
-        while ((match = regex.exec(html)) !== null) {
-            const content = match[1];
-            const noteMatch = content.match(/<h5[^>]*>(.*?)<\/h5>/i) || content.match(/1、(.*?):/i);
-            const urlMatch = content.match(/href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn)\/s\/[a-zA-Z0-9_\-]+)"/i);
-
-            if (urlMatch) {
-                const url = urlMatch[1];
-                let driveType = 'other';
-                if (url.includes('quark')) driveType = 'quark';
-                else if (url.includes('baidu')) driveType = 'baidu';
-                else if (url.includes('alipan') || url.includes('aliyundrive')) driveType = 'aliyun';
-                else if (url.includes('uc.cn')) driveType = 'uc';
-
-                items.push({
-                    note: noteMatch ? noteMatch[1].replace(/<[^>]+>/g, '').trim() : "未知资源",
-                    url: url,
-                    driveType: driveType,
-                    datetime: new Date().toISOString()
-                });
-            }
-        }
-        return { code: 0, data: items.slice(0, 10) };
-    } catch (e) {
-        return null;
-    }
+        return { code: 0, data: parsePanSearchHtml(html).slice(0, 10) };
+    } catch (e) { return null; }
 }
 
 function renderLatest(items) {
@@ -165,33 +144,34 @@ async function doSearch(keyword) {
     if (resultsInput) resultsInput.value = keyword;
 
     showResults();
-    if (resultInfo) resultInfo.textContent = `正在全网搜索并验证 "${keyword}"…`;
+    if (resultInfo) resultInfo.textContent = `正在全网搜索 "${keyword}"…`;
     setSearchLoading(true);
 
     try {
-        // 1. First, try local/deployed backend (Fastest)
+        // 1. Try backend
         let data = await tryFetchBackend(keyword);
 
-        // 2. If backend fails (e.g. GitHub Pages), fallback to Serverless Client-side mode
+        // 2. Try serverless if needed
         if (!data || data.code !== 0) {
-            console.log("[Search] Backend failed, switching to Serverless mode...");
             data = await serverlessSearch(keyword);
         }
 
         if (data && data.code === 0) {
             allResults = data.data || [];
             if (allResults.length === 0) {
-                if (resultInfo) resultInfo.textContent = `搜不到 "${keyword}" 的有效云盘链接`;
+                if (resultInfo) resultInfo.textContent = `未搜索到 "${keyword}" 的有效链接`;
+                renderCards([]);
             } else {
                 renderCards(allResults);
-                if (resultInfo) resultInfo.textContent = `搜索结果 (${allResults.length})`;
+                if (resultInfo) resultInfo.textContent = `为你找到 ${allResults.length} 条资源`;
             }
         } else {
             throw new Error("Search failed");
         }
     } catch (e) {
-        toast('请刷新页面重试', 'error');
-        if (resultInfo) resultInfo.textContent = `搜索服务暂时不可用`;
+        toast('搜索异常，请尝试刷新页面', 'error');
+        if (resultInfo) resultInfo.textContent = `服务暂时不可用`;
+        renderCards([]);
     } finally {
         isSearching = false;
         setSearchLoading(false);
@@ -214,58 +194,85 @@ async function serverlessSearch(keyword) {
         const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}`);
         if (!html) return null;
 
-        const items = [];
-        const regex = /<div class="card-body">([\s\S]*?)<\/div>/g;
-        let match;
-        while ((match = regex.exec(html)) !== null) {
-            const content = match[1];
-            const noteMatch = content.match(/<h5[^>]*>(.*?)<\/h5>/i) || content.match(/1、(.*?):/i);
-            const urlMatch = content.match(/href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn)\/s\/[a-zA-Z0-9_\-]+)"/i);
+        const rawItems = parsePanSearchHtml(html);
+        // Filter by keyword relevance
+        const filtered = rawItems.filter(it =>
+            it.note.toLowerCase().includes(keyword.toLowerCase()) ||
+            keyword.toLowerCase().includes(it.note.toLowerCase())
+        ).slice(0, 20);
 
-            if (urlMatch) {
-                const url = urlMatch[1];
-                let driveType = 'other';
-                if (url.includes('quark')) driveType = 'quark';
-                else if (url.includes('baidu')) driveType = 'baidu';
-                else if (url.includes('alipan') || url.includes('aliyundrive')) driveType = 'aliyun';
-                else if (url.includes('uc.cn')) driveType = 'uc';
-
-                items.push({
-                    note: noteMatch ? noteMatch[1].replace(/<[^>]+>/g, '').trim() : "未知资源",
-                    url: url,
-                    driveType: driveType,
-                    datetime: new Date().toISOString()
-                });
-            }
-        }
-
-        const filtered = items.filter(it => it.note.toLowerCase().includes(keyword.toLowerCase())).slice(0, 15);
         return { code: 0, data: filtered };
-    } catch (e) {
-        console.error("[Search] Serverless error", e);
-        return null;
+    } catch (e) { return null; }
+}
+
+/**
+ * Robust Scraper: Matches any valid cloud drive URL and finds the closest title.
+ */
+function parsePanSearchHtml(html) {
+    const items = [];
+    // Pattern for cloud drive links
+    const driveRegex = /href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|www\.aliyundrive\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn)\/s\/[a-zA-Z0-9_\-]+)"/gi;
+
+    let match;
+    const seenUrls = new Set();
+
+    while ((match = driveRegex.exec(html)) !== null) {
+        const url = match[1];
+        if (seenUrls.has(url)) continue;
+        seenUrls.add(url);
+
+        // Find context around this link to guess title
+        const pos = match.index;
+        const lookBack = html.substring(Math.max(0, pos - 500), pos);
+
+        // 1. Try to find <h5> title (common on PanSearch)
+        const h5Match = lookBack.match(/<h5[^>]*>(.*?)<\/h5>/i);
+        // 2. Try to find numbered list prefix e.g. "1、Title:"
+        const listMatch = lookBack.match(/(\d+、|【)(.*?)(:|<|\n|】)/i);
+
+        let title = "未知资源";
+        if (h5Match) title = h5Match[1];
+        else if (listMatch) title = listMatch[2];
+
+        title = title.replace(/<[^>]+>/g, '').trim();
+
+        let driveType = 'other';
+        if (url.includes('quark')) driveType = 'quark';
+        else if (url.includes('baidu')) driveType = 'baidu';
+        else if (url.includes('aliyun')) driveType = 'aliyun';
+        else if (url.includes('uc.cn')) driveType = 'uc';
+
+        items.push({
+            note: title,
+            url: url,
+            driveType: driveType,
+            datetime: new Date().toISOString()
+        });
     }
+    return items;
 }
 
 // ─── UI HELPERS ──────────────────────────────────────────────────────────────
 function renderCards(list) {
     if (!resultsGrid) return;
     const filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
+
     if (!filtered.length) {
-        resultsGrid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>暂无结果</p></div>`;
+        resultsGrid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>暂无相关资源，换个词试试？</p></div>`;
         return;
     }
+
     resultsGrid.innerHTML = filtered.map((item, idx) => {
         const type = item.driveType || 'other';
         const badgeClass = `badge-${['quark', 'baidu', 'aliyun', 'uc', '115', 'pikpak'].includes(type) ? type : 'other'}`;
         const onClickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
-        return `<div class="card card-clickable" style="animation-delay:${Math.min(idx * 0.03, 0.5)}s" onclick="${onClickAction}">
+        return `<div class="card card-clickable" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${onClickAction}">
             <span class="drive-badge ${badgeClass}">${type}</span>
             <div class="card-body">
                 <div class="card-name" title="${escAttr(item.note)}">${escHtml(item.note)}</div>
                 <div class="card-meta"><span>📅 ${item.datetime ? item.datetime.split('T')[0] : '未知'}</span></div>
             </div>
-            <button class="btn-icon tag" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
+            <button class="btn-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
         </div>`;
@@ -273,19 +280,28 @@ function renderCards(list) {
 }
 
 function showSearch() {
-    if (viewSearch) viewSearch.classList.add('active');
-    if (viewResults) viewResults.classList.remove('active');
+    viewSearch.classList.add('active');
+    viewResults.classList.remove('active');
     allResults = [];
+    // Clear search bar values for new search if desired, or keep them
 }
+
 function showResults() {
-    if (viewSearch) viewSearch.classList.remove('active');
-    if (viewResults) viewResults.classList.add('active');
-    if (resultsGrid) resultsGrid.innerHTML = '';
+    viewSearch.classList.remove('active');
+    viewResults.classList.add('active');
+    resultsGrid.innerHTML = '';
 }
+
 function setSearchLoading(on) {
     if (searchBtn) searchBtn.disabled = on;
     if (resultsSearchBtn) resultsSearchBtn.disabled = on;
-    if (on && resultsGrid) resultsGrid.innerHTML = Array(6).fill('<div class="card" style="height:120px"><div class="skel-row" style="height:100%;border-radius:10px"></div></div>').join('');
+    if (on) {
+        // Solid loading indicator instead of flickering skeletons
+        resultsGrid.innerHTML = `<div class="loading-state">
+            <div class="loading-spinner"></div>
+            <p>正在努力调取最优质的资源，请稍候...</p>
+        </div>`;
+    }
 }
 
 async function quarkSave(url) {
@@ -293,7 +309,7 @@ async function quarkSave(url) {
     if (!m) { window.open(url, '_blank'); return; }
     toast('正在调起夸克客户端…', 'info');
     try {
-        const res = await fetch(`http://localhost:9128/desktop_share_visiting?pwd_id=${m[1]}`, { signal: AbortSignal.timeout(3000) });
+        const res = await fetch(`http://localhost:9128/desktop_share_visiting?pwd_id=${m[1]}`, { signal: AbortSignal.timeout(2000) });
         if (res.ok) toast('已在夸克 APP 打开', 'success');
         else window.open(url, '_blank');
     } catch { window.open(url, '_blank'); }
@@ -316,4 +332,4 @@ function toast(msg, type = 'info') {
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
-window.doSearch = doSearch; window.quarkSave = quarkSave; window.copyUrl = copyUrl;
+window.doSearch = doSearch; window.showSearch = showSearch; window.copyUrl = copyUrl;
