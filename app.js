@@ -43,6 +43,11 @@ let GroupCache = {}; // Cache for hidden results
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
+function normalizeTitle(s) {
+    if (!s) return "";
+    return s.replace(/[【】\[\]\s\-\.\(\)]/g, "").toLowerCase().trim();
+}
+
 // ─── CACHE MANAGER (Hourly / Manual) ─────────────────────────────────────────
 const CacheManager = {
     keys: { discovery: 'ps_discovery_v5', hot: 'ps_hot_v5' },
@@ -636,10 +641,27 @@ function renderCards(list) {
     const grid = $('results-grid');
     if (!grid) return;
 
-    // Calculate Stats
-    const totalCount = filtered.length;
-    const driveCounts = { 'all': list.length };
-    list.forEach(it => {
+    // --- Step 1: Aggregation Logic ---
+    const aggregated = [];
+    const aggMap = new Map(); // key: normalizeTitle + driveType
+
+    filtered.forEach(item => {
+        const norm = normalizeTitle(item.note);
+        const key = `${norm}|${item.driveType}`;
+        if (!aggMap.has(key)) {
+            aggMap.set(key, { ...item, _aggCount: 1 });
+            aggregated.push(aggMap.get(key));
+        } else {
+            const existing = aggMap.get(key);
+            existing._aggCount++;
+            if (item.note.length > existing.note.length) existing.note = item.note;
+        }
+    });
+
+    // Calculate Stats based on aggregated list
+    const totalCount = aggregated.length;
+    const driveCounts = { 'all': aggregated.length };
+    aggregated.forEach(it => {
         const t = it.driveType || 'other';
         driveCounts[t] = (driveCounts[t] || 0) + 1;
     });
@@ -653,14 +675,14 @@ function renderCards(list) {
     });
 
     const infoEl = $('result-info');
-    if (infoEl) infoEl.textContent = totalCount ? `为你展示 ${totalCount} 条资源` : '未发现匹配资源';
+    if (infoEl) infoEl.textContent = totalCount ? `为你展示 ${totalCount} 条聚合资源` : '未发现匹配资源';
 
     if (!totalCount) {
         grid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>${isPrecise ? '精确模式下未匹配到结果，可尝试关闭精确筛选' : '换个关键词试试？'}</p></div>`;
         return;
     }
     const groups = {};
-    filtered.forEach(it => { (groups[it.driveType || 'other'] = groups[it.driveType || 'other'] || []).push(it); });
+    aggregated.forEach(it => { (groups[it.driveType || 'other'] = groups[it.driveType || 'other'] || []).push(it); });
     const sortedTypes = Object.keys(groups).sort((a, b) => {
         const p = { 'aliyun': 1, 'quark': 2, 'baidu': 3, 'uc': 4, 'xunlei': 5, 'mobile': 6, 'telecom': 7, 'pikpak': 8, '115': 9, 'other': 10 };
         return (p[a] || 99) - (p[b] || 99);
@@ -671,9 +693,13 @@ function renderCards(list) {
         const gid = `g-${type.replace(/[^ac-z0-9]/g, '')}`;
         if (hidden.length) GroupCache[gid] = hidden;
 
+        const typeName = DRIVE_NAMES[type] || '其他';
         return `
             <div class="result-group" id="group-${type}">
-                <div class="group-header"><span class="group-title">${escHtml(DRIVE_NAMES[type] || '其他')}</span><div class="group-line"></div></div>
+                <div class="group-header">
+                    <span class="group-title">${escHtml(typeName)} <small style="opacity:0.6;font-weight:normal;margin-left:8px">共 ${items.length} 个结果</small></span>
+                    <div class="group-line"></div>
+                </div>
                 <div class="group-visible" id="${gid}-v">${visible.map((it, idx) => renderSingleCard(it, idx)).join('')}</div>
                 ${hidden.length ? `
                     <div id="${gid}-h" class="hidden-results"></div>
