@@ -221,28 +221,39 @@ h1 {
     color: #fff;
 }
 
-/* ===== DISCOVERY ===== */
-.discovery {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 16px;
-    max-width: 860px;
-    margin: 0 auto;
+/* ===== HOT SEARCH BOX (New Layout) ===== */
+.hot-search-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 10px;
+    flex-wrap: wrap;
 }
 
-@media (max-width: 640px) {
-    .discovery {
-        grid-template-columns: 1fr;
-    }
+.hot-title {
+    font-size: 0.82rem;
+    color: var(--muted);
+    font-weight: 500;
+}
+
+/* ===== DISCOVERY ===== */
+.discovery {
+    max-width: 860px;
+    margin: 0 auto;
 }
 
 .disc-section {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 18px 20px;
+    padding: 18px 24px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
+}
+
+.disc-section.full-width {
+    width: 100%;
 }
 
 .disc-section h3 {
