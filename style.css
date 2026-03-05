@@ -134,8 +134,20 @@ h1 {
     position: relative;
     max-width: 760px;
     /* Wider to accommodate toggle */
-    margin: 0 auto 20px;
+    margin: 0 auto 16px;
     z-index: 100;
+}
+
+.sticky-controls {
+    position: sticky;
+    top: 0;
+    z-index: 1001;
+    background: rgba(10, 10, 18, 0.75);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    padding: 20px 20px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
 }
 
 .search-container {
@@ -1256,6 +1268,15 @@ h1 {
     margin-left: 8px;
     flex-shrink: 0;
     border: 1px solid rgba(129, 140, 248, 0.15);
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    user-select: none;
+}
+
+.type-tag-mini:hover {
+    transform: translateY(-1px) scale(1.05);
+    filter: brightness(1.2);
+    box-shadow: 0 4px 12px rgba(129, 140, 248, 0.2);
 }
 
 .type-tag-movie {

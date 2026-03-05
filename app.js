@@ -36,6 +36,7 @@ const KEYWORD_ALIASES = {
 // ─── State ────────────────────────────────────────────────────────────────────
 let allResults = [];
 let activeType = 'all';
+let activeCategory = 'all'; // New resource category filter
 let isSearching = false;
 let searchController = null; // For interrupting active searches
 let GroupCache = {}; // Cache for hidden results
@@ -472,6 +473,7 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
         fetchPromises.push(tryFetchBackend(keyword));
         fetchPromises.push(serverlessSearch(keyword));
+        fetchPromises.push(searchByEngine(keyword));
 
         const responses = await Promise.all(fetchPromises);
         if (signal.aborted) return;
@@ -479,6 +481,12 @@ async function doSearch(keyword, mode = 'fuzzy') {
         let allRecords = [];
         responses.forEach(resp => {
             if (!resp) return;
+
+            // Handle Engine Search results (array of objects)
+            if (Array.isArray(resp) && resp.length > 0 && resp[0].source === '引擎搜索') {
+                allRecords = allRecords.concat(resp);
+                return;
+            }
             try {
                 // Handle both raw strings (from AllOrigins) and parsed objects
                 const json = typeof resp === 'string' ? JSON.parse(resp) : resp;
@@ -666,6 +674,14 @@ function renderCards(list) {
 
     // UI Filter + Strict Matching Filter
     let filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
+
+    // Apply Resource Category Filter (电影, 资料, etc.)
+    if (activeCategory !== 'all') {
+        filtered = filtered.filter(item => {
+            const cat = classifyResource(item.note || item.title || "");
+            return cat === activeCategory;
+        });
+    }
 
     if (isPrecise && kw) {
         const kws = kw.split(/\s+/).filter(Boolean);
@@ -935,5 +951,47 @@ function toast(m, t = 'info') {
 }
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
+
+// ─── External Engine Search ──────────────────────────────────────────────────
+async function searchByEngine(kw) {
+    const dorks = [
+        `https://www.bing.com/search?q=site:pan.quark.cn%20${encodeURIComponent(kw)}`,
+        `https://www.bing.com/search?q=site:pan.baidu.com%20${encodeURIComponent(kw)}`,
+        `https://www.bing.com/search?q=alipan.com%2Fs%2F%20${encodeURIComponent(kw)}`
+    ];
+    const all = [];
+    const results = await Promise.all(dorks.map(url => fetchWithProxy(url).catch(() => null)));
+    results.forEach(html => {
+        if (!html || typeof html !== 'string') return;
+        const driveRegex = /href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|www\.aliyundrive\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn|yun\.139\.com|cloud\.189\.cn|pan\.wo\.cn|115\.com|mypikpak\.com)\/s\/[a-zA-Z0-9_\-]+)"/gi;
+        let match;
+        while ((match = driveRegex.exec(html)) !== null) {
+            const url = match[1];
+            // Infer title from surrounding text (simplified for engine snippets)
+            const pos = match.index;
+            const lookBack = html.substring(Math.max(0, pos - 200), pos);
+            const titleMatch = lookBack.match(/>([^<]{2,50})<\/a>/i) || lookBack.match(/>([^<]{2,50})$/i);
+            const title = (titleMatch ? titleMatch[1] : kw).replace(/<[^>]+>/g, '').trim();
+            all.push({ note: title || kw, url: url, datetime: new Date().toISOString(), source: '引擎搜索' });
+        }
+    });
+    return all;
+}
+
+// ─── Click Listener for Type Tags (Category Filtering) ────────────────────────
+document.addEventListener('click', e => {
+    const tag = e.target.closest('.type-tag-mini');
+    if (tag) {
+        const catName = tag.textContent.trim();
+        if (activeCategory === catName) {
+            activeCategory = 'all';
+            toast(`已重置分类筛选`, 'info');
+        } else {
+            activeCategory = catName;
+            toast(`当前筛选: ${catName}`, 'info');
+        }
+        renderCards(allResults);
+    }
+});
 
 window.doSearch = doSearch; window.HistoryManager = HistoryManager; window.toggleGroup = toggleGroup; window.copyUrl = copyUrl; window.CacheManager = CacheManager; window.loadDiscoverySingle = loadDiscoverySingle; window.toggleNested = toggleNested;
