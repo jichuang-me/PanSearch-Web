@@ -149,6 +149,8 @@ function bindEvents() {
             if (!input.value.trim()) {
                 const discovery = $('discovery');
                 if (discovery) discovery.style.display = 'flex';
+                const header = $('hero-header');
+                if (header) header.classList.remove('collapsed');
                 const results = $('results-grid');
                 if (results) results.innerHTML = '';
             }
@@ -265,9 +267,9 @@ async function doSearch(keyword, mode = 'fuzzy') {
     setSearchLoading(true);
 
     setTimeout(() => {
-        const grid = $('results-grid');
-        if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 100);
+        const bar = $('search-bar');
+        if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 150);
 
     try {
         let results = [];
@@ -402,8 +404,10 @@ function showResults() {
 function setSearchLoading(on) {
     if ($('search-btn')) $('search-btn').disabled = on;
     const discovery = $('discovery');
-    if (on && discovery) {
-        discovery.style.display = 'none';
+    const header = $('hero-header');
+    if (on) {
+        if (discovery) discovery.style.display = 'none';
+        if (header) header.classList.add('collapsed');
     }
     if (on) $('results-grid').innerHTML = `<div class="loading-state" style="margin-top:24px"><div class="loading-spinner"></div><p>正在智能抓取全网高质量资源...</p></div>`;
 }
