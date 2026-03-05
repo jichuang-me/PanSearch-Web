@@ -145,9 +145,16 @@ function bindEvents() {
         input.onkeydown = e => {
             if (e.key === 'Enter') { e.preventDefault(); handleS(); }
         };
+        input.oninput = () => {
+            if (!input.value.trim()) {
+                const discovery = $('discovery');
+                if (discovery) discovery.style.display = 'flex';
+                const results = $('results-grid');
+                if (results) results.innerHTML = '';
+            }
+        };
         input.onfocus = () => HistoryManager.show();
         input.onblur = () => HistoryManager.hide();
-        // Stop current search if user starts typing a fresh new keyword (optional refinement)
     }
 
     if ($('search-btn')) $('search-btn').onclick = () => handleS();
@@ -393,8 +400,11 @@ function showResults() {
 }
 
 function setSearchLoading(on) {
-    if ($('search-fuzzy-btn')) $('search-fuzzy-btn').disabled = on;
-    if ($('search-exact-btn')) $('search-exact-btn').disabled = on;
+    if ($('search-btn')) $('search-btn').disabled = on;
+    const discovery = $('discovery');
+    if (on && discovery) {
+        discovery.style.display = 'none';
+    }
     if (on) $('results-grid').innerHTML = `<div class="loading-state" style="margin-top:24px"><div class="loading-spinner"></div><p>正在智能抓取全网高质量资源...</p></div>`;
 }
 
