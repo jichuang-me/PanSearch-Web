@@ -311,13 +311,13 @@ h1 {
     animation: fade-up 0.5s var(--ease);
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1024px) {
     .discovery-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 680px) {
     .discovery-grid {
         grid-template-columns: 1fr;
     }
@@ -332,6 +332,7 @@ h1 {
     -webkit-backdrop-filter: blur(10px);
     display: flex;
     flex-direction: column;
+    width: 100%;
 }
 
 .disc-col h3 {
