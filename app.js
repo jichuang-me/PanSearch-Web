@@ -10,7 +10,7 @@ const BACKEND_URL = (window.location.protocol === 'file:')
 
 const PROXIES = [
     'https://api.allorigins.win/get?url=',
-    'https://cors-anywhere.azm.workers.dev/' // Fallback
+    'https://cors-anywhere.azm.workers.dev/'
 ];
 
 const HOT_KEYWORDS = [
@@ -26,38 +26,58 @@ let isSearching = false;
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
+// DOM Elements
+const viewSearch = $('view-search');
+const viewResults = $('view-results');
+const searchInput = $('search-input');
+const searchBtn = $('search-btn');
+const resultsInput = $('results-input');
+const resultsSearchBtn = $('results-search-btn');
+const backBtn = $('back-btn');
+const resultsGrid = $('results-grid');
+const resultInfo = $('result-info');
+const hotTagsEl = $('hot-tags');
+const latestListEl = $('latest-list');
+
 async function fetchWithProxy(url) {
-    // Try AllOrigins first
     try {
         const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`;
         const res = await fetch(proxyUrl);
         const json = await res.json();
         return json.contents;
     } catch (e) {
-        // Simple fallback (might need CORS permission or different proxy)
-        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-        return await res.text();
+        try {
+            const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+            return await res.text();
+        } catch (e2) {
+            return null;
+        }
     }
 }
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 (function init() {
+    if (!viewSearch) return;
     bindEvents();
     loadDiscovery();
 })();
 
 function bindEvents() {
-    searchBtn.onclick = () => doSearch(searchInput.value.trim());
-    searchInput.onkeydown = e => e.key === 'Enter' && doSearch(searchInput.value.trim());
-    resultsSearchBtn.onclick = () => doSearch(resultsInput.value.trim());
-    resultsInput.onkeydown = e => e.key === 'Enter' && doSearch(resultsInput.value.trim());
-    backBtn.onclick = showSearch;
+    if (searchBtn) searchBtn.onclick = () => doSearch(searchInput.value.trim());
+    if (searchInput) searchInput.onkeydown = e => e.key === 'Enter' && doSearch(searchInput.value.trim());
+    if (resultsSearchBtn) resultsSearchBtn.onclick = () => doSearch(resultsInput.value.trim());
+    if (resultsInput) resultsInput.onkeydown = e => e.key === 'Enter' && doSearch(resultsInput.value.trim());
+    if (backBtn) backBtn.onclick = showSearch;
 
     document.querySelectorAll('.type-filter .tag').forEach(tag => {
         tag.onclick = () => {
-            tag.closest('.type-filter').querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll(`.type-filter .tag[data-type="${tag.dataset.type}"]`).forEach(t => t.classList.add('active'));
-            activeType = tag.dataset.type;
+            const type = tag.dataset.type;
+            document.querySelectorAll('.type-filter').forEach(container => {
+                container.querySelectorAll('.tag').forEach(t => {
+                    t.classList.toggle('active', t.dataset.type === type);
+                });
+            });
+            activeType = type;
             renderCards(allResults);
         };
     });
@@ -65,17 +85,24 @@ function bindEvents() {
 
 // ─── DISCOVERY ───────────────────────────────────────────────────────────────
 async function loadDiscovery() {
-    hotTagsEl.innerHTML = HOT_KEYWORDS.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${k}</span>`).join('');
+    if (hotTagsEl) {
+        hotTagsEl.innerHTML = HOT_KEYWORDS.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${k}</span>`).join('');
+    }
+
     try {
         const data = await tryFetchBackend('latest');
         if (data && data.code === 0) {
             renderLatest(data.data);
+        } else {
+            if (latestListEl) latestListEl.innerHTML = '<div class="latest-item" style="color:var(--muted);font-size:.8rem">欢迎使用！输入关键词开始搜索</div>';
         }
-    } catch (e) { }
+    } catch (e) {
+        if (latestListEl) latestListEl.innerHTML = '<div class="latest-item" style="color:var(--muted);font-size:.8rem">欢迎使用！输入关键词开始搜索</div>';
+    }
 }
 
 function renderLatest(items) {
-    if (!items || !items.length) return;
+    if (!items || !items.length || !latestListEl) return;
     latestListEl.innerHTML = items.map(item => {
         const dotClass = `dot-${item.driveType}` in { 'dot-quark': 1, 'dot-baidu': 1, 'dot-aliyun': 1, 'dot-uc': 1, 'dot-115': 1, 'dot-pikpak': 1 } ? `dot-${item.driveType}` : 'dot-default';
         return `<div class="latest-item" onclick="doSearch('${escAttr(item.note)}')">
@@ -91,10 +118,11 @@ async function doSearch(keyword) {
     if (!keyword || isSearching) return;
     isSearching = true;
     keyword = keyword.trim();
-    searchInput.value = resultsInput.value = keyword;
+    if (searchInput) searchInput.value = keyword;
+    if (resultsInput) resultsInput.value = keyword;
 
     showResults();
-    resultInfo.textContent = `正在全网搜索并验证 "${keyword}"…`;
+    if (resultInfo) resultInfo.textContent = `正在全网搜索并验证 "${keyword}"…`;
     setSearchLoading(true);
 
     try {
@@ -110,17 +138,17 @@ async function doSearch(keyword) {
         if (data && data.code === 0) {
             allResults = data.data || [];
             if (allResults.length === 0) {
-                resultInfo.textContent = `搜不到 "${keyword}" 的有效云盘链接`;
+                if (resultInfo) resultInfo.textContent = `搜不到 "${keyword}" 的有效云盘链接`;
             } else {
                 renderCards(allResults);
-                resultInfo.textContent = `搜索结果 (${allResults.length})`;
+                if (resultInfo) resultInfo.textContent = `搜索结果 (${allResults.length})`;
             }
         } else {
             throw new Error("Search failed");
         }
     } catch (e) {
         toast('搜索失败，请检查网络', 'error');
-        resultInfo.textContent = `搜索服务暂时不可用`;
+        if (resultInfo) resultInfo.textContent = `搜索服务暂时不可用`;
     } finally {
         isSearching = false;
         setSearchLoading(false);
@@ -130,9 +158,10 @@ async function doSearch(keyword) {
 async function tryFetchBackend(kw) {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 2000); // Quick timeout for backend check
+        const timeoutId = setTimeout(() => controller.abort(), 1500);
         const res = await fetch(`${BACKEND_URL}?q=${encodeURIComponent(kw)}`, { signal: controller.signal });
         clearTimeout(timeoutId);
+        if (!res.ok) return null;
         return await res.json();
     } catch (e) { return null; }
 }
@@ -141,6 +170,8 @@ async function tryFetchBackend(kw) {
 async function serverlessSearch(keyword) {
     try {
         const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}`);
+        if (!html) return null;
+
         const items = [];
         const regex = /<div class="card-body">([\s\S]*?)<\/div>/g;
         let match;
@@ -166,7 +197,6 @@ async function serverlessSearch(keyword) {
             }
         }
 
-        // Basic keyword filter
         const filtered = items.filter(it => it.note.toLowerCase().includes(keyword.toLowerCase())).slice(0, 15);
         return { code: 0, data: filtered };
     } catch (e) {
@@ -177,6 +207,7 @@ async function serverlessSearch(keyword) {
 
 // ─── UI HELPERS ──────────────────────────────────────────────────────────────
 function renderCards(list) {
+    if (!resultsGrid) return;
     const filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
     if (!filtered.length) {
         resultsGrid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>暂无结果</p></div>`;
@@ -199,11 +230,20 @@ function renderCards(list) {
     }).join('');
 }
 
-function showSearch() { viewSearch.classList.add('active'); viewResults.classList.remove('active'); allResults = []; }
-function showResults() { viewSearch.classList.remove('active'); viewResults.classList.add('active'); resultsGrid.innerHTML = ''; }
+function showSearch() {
+    if (viewSearch) viewSearch.classList.add('active');
+    if (viewResults) viewResults.classList.remove('active');
+    allResults = [];
+}
+function showResults() {
+    if (viewSearch) viewSearch.classList.remove('active');
+    if (viewResults) viewResults.classList.add('active');
+    if (resultsGrid) resultsGrid.innerHTML = '';
+}
 function setSearchLoading(on) {
-    searchBtn.disabled = resultsSearchBtn.disabled = on;
-    if (on) resultsGrid.innerHTML = Array(6).fill('<div class="card" style="height:120px"><div class="skel-row" style="height:100%;border-radius:10px"></div></div>').join('');
+    if (searchBtn) searchBtn.disabled = on;
+    if (resultsSearchBtn) resultsSearchBtn.disabled = on;
+    if (on && resultsGrid) resultsGrid.innerHTML = Array(6).fill('<div class="card" style="height:120px"><div class="skel-row" style="height:100%;border-radius:10px"></div></div>').join('');
 }
 
 async function quarkSave(url) {
@@ -224,8 +264,10 @@ function copyUrl(url) {
 }
 
 function toast(msg, type = 'info') {
+    const container = $('toast-container');
+    if (!container) return;
     const el = document.createElement('div'); el.className = `toast ${type}`; el.textContent = msg;
-    $('toast-container').appendChild(el);
+    container.appendChild(el);
     setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 280); }, 3000);
 }
 
