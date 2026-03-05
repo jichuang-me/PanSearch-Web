@@ -454,9 +454,9 @@ h1 {
 .disc-col-inline {
     display: flex;
     align-items: center;
-    padding: 10px 0;
+    padding: 6px 0;
+    /* Tightened spacing */
     width: 100%;
-    border-bottom: 1px solid var(--border);
     overflow: hidden;
 }
 
@@ -680,11 +680,7 @@ h1 {
 }
 
 .results-ui-sync {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
-    margin-bottom: 24px;
+    margin-bottom: 12px;
 }
 
 .results-ui-sync .type-filter {
@@ -692,8 +688,8 @@ h1 {
 }
 
 .results-ui-sync .hot-search-box {
-    margin-top: 0;
-    justify-content: flex-start;
+    display: none;
+    /* Obsolete now that it's in discovery-grid */
 }
 
 .back-btn {
