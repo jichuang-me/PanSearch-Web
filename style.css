@@ -1176,13 +1176,13 @@ h1 {
 }
 
 .nested-items {
-    padding: 4px 12px 12px 16px;
-    background: rgba(255, 255, 255, 0.02);
-    border-left: 2px solid var(--border);
-    margin-left: 14px;
+    padding: 2px 0 12px 0;
+    background: rgba(255, 255, 255, 0.015);
+    border-left: none;
+    margin-left: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
     animation: fade-down 0.2s ease;
 }
 
@@ -1190,12 +1190,12 @@ h1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 8px;
+    padding: 8px 8px;
+    background: rgba(255, 255, 255, 0.025);
+    border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     gap: 12px;
 }
 
@@ -1225,8 +1225,7 @@ h1 {
 }
 
 .nested-item:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateX(4px);
+    background: rgba(255, 255, 255, 0.08);
 }
 
 .nested-url-title {
