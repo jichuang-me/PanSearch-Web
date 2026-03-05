@@ -893,18 +893,23 @@ h1 {
     color: #94a3b8;
 }
 
+.list-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
 /* Validity Indicator */
 .validity-indicator {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    color: #10b981;
-    /* Default to success green */
+    justify-content: center;
+    padding: 4px;
 }
 
 .valid-dot {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background-color: #10b981;
     box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
@@ -921,7 +926,6 @@ h1 {
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
-    margin-left: auto;
 }
 
 .btn-icon:hover {

@@ -22,6 +22,21 @@ const DRIVE_NAMES = {
     'pikpak': 'PikPak', '115': '115网盘', 'other': '其他资源'
 };
 
+const DRIVE_DOMAINS = [
+    'pan.quark.cn', 'www.alipan.com', 'www.aliyundrive.com', 'pan.baidu.com',
+    'pan.xunlei.com', 'drive.uc.cn', 'yun.139.com', 'cloud.189.cn',
+    'pan.wo.cn', '115.com', 'mypikpak.com'
+];
+
+// Simple Alias & Pinyin Mapping for fuzzier broad search
+const KEYWORD_ALIASES = {
+    '黑神话悟空': ['heishenhua', 'wukong', '黑马', 'blackmyth', 'black myth'],
+    '三体': ['santi', '3body', 'three body'],
+    '甄嬛传': ['zhenhuan', 'zhz'],
+    '权力的游戏': ['got', 'game of thrones', '权游'],
+    '流浪地球': ['diqiu', 'wandering earth'],
+};
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let allResults = [];
 let activeType = 'all';
@@ -313,22 +328,27 @@ async function doSearch(keyword, mode = 'fuzzy') {
         const seenUrls = new Set();
         const kwLower = keyword.toLowerCase();
         const kws = kwLower.split(/\s+/).filter(Boolean);
+        const aliases = KEYWORD_ALIASES[keyword] || [];
 
         allRecords.forEach(item => {
             if (!item.url || seenUrls.has(item.url)) return;
 
+            // Hard Filter: Must be a valid cloud drive link
+            const isDriveLink = DRIVE_DOMAINS.some(domain => item.url.includes(domain));
+            if (!isDriveLink) return;
+
             const note = (item.title || item.note || '').toLowerCase();
 
-            // Stage 1: smart relevance check (multi-keyword)
+            // Stage 1: smart relevance check (multi-keyword + alias)
             const isGeneric = note === "未知资源" || note === "";
             // We relax the filter to allow partial matches if the backend returned it, 
             // but we boost the score if it matches all query fragments perfectly.
-            const matchesAll = isGeneric || kws.every(k => note.includes(k) || kwLower.includes(note));
-            const matchesAny = isGeneric || kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
+            const matchesAll = kws.every(k => note.includes(k) || kwLower.includes(note));
+            const matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
+            const matchesAlias = aliases.some(a => note.includes(a));
 
-            // If it doesn't match ANY keyword part, we still might allow it if it came from the API 
-            // since the API sometimes returns semantic results. But let's require at least some match to avoid total garbage.
-            if (!isGeneric && !matchesAny) return;
+            // If it doesn't match ANY keyword part AND no alias matches, drop it to avoid garbage
+            if (!isGeneric && !matchesAny && !matchesAlias) return;
 
             // Stage 2: Quality/Recency Scoring
             let score = 0;
@@ -466,14 +486,15 @@ function renderSingleCard(item, idx) {
                 <div class="list-item-meta">
                     <span class="drive-badge-text badge-text-${type}">${escHtml(driveName)}</span>
                     <span class="meta-divider">|</span>
-                    <span class="validity-indicator"><span class="valid-dot"></span>有效资源</span>
-                    <span class="meta-divider">|</span>
                     <span>📅 ${item.datetime ? item.datetime.split('T')[0] : '未知'}</span>
                 </div>
             </div>
-            <button class="btn-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            </button>
+            <div class="list-item-actions">
+                <span class="validity-indicator" title="资源可能有效"><span class="valid-dot"></span></span>
+                <button class="btn-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </button>
+            </div>
         </div>`;
 }
 
