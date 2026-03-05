@@ -85,7 +85,7 @@ const CacheManager = {
 
     async refreshAll() {
         toast('正在获取全网最新资源...', 'info');
-        await Promise.all([loadHotKeywords(true), loadDiscovery(true)]);
+        await loadDiscovery('all', true);
         toast('内容已同步', 'success');
     }
 };
@@ -93,15 +93,12 @@ const CacheManager = {
 // ─── UI SYNC & RENDER ────────────────────────────────────────────────────────
 const UISync = {
     init() {
-        this.renderHotTags(CacheManager.get('hot') || DEFAULT_HOT_KEYWORDS);
+        // V26: Auto-load "All" discovery feed into main results grid on startup
+        loadDiscovery('all');
     },
 
     renderHotTags(list) {
-        const html = list.map(k => `<span class="hot-pill" onclick="doSearch('${escAttr(k)}', 'fuzzy')">${escHtml(k)}</span>`).join('');
-        const hotTagsContainer = $('hot-tags');
-        if (hotTagsContainer) {
-            hotTagsContainer.innerHTML = html;
-        }
+        // Obsolete: Hot tags removed from landing page
     },
 
     syncFilters() {
@@ -400,11 +397,16 @@ async function loadLatestFeed(type = 'all') {
         renderCards(allResults);
 
         if (feed.length === 0) {
-            grid.innerHTML = `<div class="empty-state"><p>该网盘暂时没有最新资源更新。</p></div>`;
+            grid.innerHTML = `<div class="empty-state"><p>暂时没有最新资源更新。</p></div>`;
         }
     } catch (e) {
-        grid.innerHTML = '<div class="empty-state"><p>暂时无法加载推荐流，请尝试直接搜索。</p></div>';
+        console.error('Feed load error:', e);
+        if (grid) grid.innerHTML = '<div class="empty-state"><p>暂时无法加载推荐流，请尝试直接搜索。</p></div>';
     }
+}
+
+async function loadDiscoverySingle(type) {
+    // Obsolete: Single category rows removed
 }
 
 // ─── SEARCH ENGINE ────────────────────────────────────────────────────────────
@@ -732,11 +734,14 @@ function renderSingleCard(item, idx) {
     // Unique ID for nested toggle
     const nid = `nid-${Math.random().toString(36).substr(2, 9)}`;
 
+    const catName = item.category_name || (item.tags ? item.tags[0] : null) || '资源';
+
     return `
         <div class="list-item-wrapper">
             <div class="list-item" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${clickAction}">
                 <div class="list-item-body">
                     <div class="list-item-title" title="${escAttr(item.note)}">
+                        <span class="type-tag-mini">${escHtml(catName)}</span>
                         ${escHtml(item.note)}
                         ${hasMembers ? `<span class="agg-badge" onclick="event.stopPropagation(); toggleNested('${nid}')">📦 ${item.members.length}个结果</span>` : ''}
                     </div>
@@ -766,6 +771,7 @@ function renderSingleCard(item, idx) {
         return `
                         <div class="nested-item" onclick="${mClick}">
                             <div class="nested-item-left">
+                                <span class="type-tag-mini">${escHtml(m.category_name || (m.tags ? m.tags[0] : null) || '资源')}</span>
                                 <span class="nested-url-title text-truncate">${escHtml(m.title || m.note || m.url)}</span>
                                 ${m.pwd ? `<span class="nested-tag-mini pwd">🔑 ${escHtml(m.pwd)}</span>` : ''}
                                 ${m.size ? `<span class="nested-tag-mini size">💾 ${escHtml(m.size)}</span>` : ''}

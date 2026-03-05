@@ -1246,6 +1246,18 @@ h1 {
     margin-right: 12px;
 }
 
+.type-tag-mini {
+    padding: 1px 6px;
+    background: rgba(129, 140, 248, 0.12);
+    color: var(--primary);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-right: 8px;
+    flex-shrink: 0;
+    border: 1px solid rgba(129, 140, 248, 0.15);
+}
+
 .nested-tag-mini {
     padding: 1px 6px;
     background: rgba(255, 255, 255, 0.05);
