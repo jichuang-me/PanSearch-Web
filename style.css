@@ -526,6 +526,7 @@ h1 {
     margin-bottom: 20px;
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 8px;
     border-bottom: 1px solid var(--border);
     padding-bottom: 12px;
@@ -553,8 +554,15 @@ h1 {
 
 .hot-tags {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
+    /* Allow wrapping for discovery grid */
     gap: 12px;
+    align-items: center;
+}
+
+#main-hot .hot-tags {
+    flex-wrap: nowrap;
+    /* Keep main hot tags single-line */
 }
 
 .hot-pill {
@@ -571,6 +579,7 @@ h1 {
     text-decoration-color: rgba(129, 140, 248, 0.4) !important;
     text-underline-offset: 4px !important;
     display: inline-block !important;
+    white-space: nowrap !important;
 }
 
 .hot-pill:hover {

@@ -52,10 +52,7 @@ const CacheManager = {
 
     async refreshAll() {
         toast('正在获取全网最新资源...', 'info');
-        const link = $('refresh-discovery');
-        if (link) link.classList.add('loading');
         await Promise.all([loadHotKeywords(true), loadDiscovery(true)]);
-        if (link) link.classList.remove('loading');
         toast('内容已同步', 'success');
     }
 };
@@ -64,29 +61,18 @@ const CacheManager = {
 const UISync = {
     init() {
         this.renderHotTags(CacheManager.get('hot') || DEFAULT_HOT_KEYWORDS);
-        this.syncFilters();
     },
 
     renderHotTags(list) {
         const html = list.map(k => `<span class="hot-pill" onclick="doSearch('${escAttr(k)}', 'fuzzy')">${escHtml(k)}</span>`).join('');
-        const containers = [$('hot-tags'), $('results-hot')];
-        containers.forEach(c => {
-            if (c) {
-                if (c.id === 'results-hot') c.innerHTML = `<span class="hot-title">🔥 热门：</span><div class="hot-tags">${html}</div>`;
-                else c.innerHTML = html;
-            }
-        });
+        const hotTagsContainer = $('hot-tags');
+        if (hotTagsContainer) {
+            hotTagsContainer.innerHTML = html;
+        }
     },
 
     syncFilters() {
-        const filterHtml = $('main-filter') ? $('main-filter').innerHTML : '';
-        const resultsFilter = $('results-filter');
-        if (resultsFilter) {
-            resultsFilter.innerHTML = filterHtml;
-            resultsFilter.querySelectorAll('.tag').forEach(tag => {
-                tag.onclick = () => this.handleFilterClick(tag);
-            });
-        }
+        // Obsolete
     },
 
     handleFilterClick(tag) {
@@ -149,27 +135,22 @@ const HistoryManager = {
 
 function bindEvents() {
     const handleS = (mode) => {
-        const vr = $('view-results');
-        const input = (vr && vr.classList.contains('active')) ? $('results-input') : $('search-input');
-        const val = input.value.trim();
+        const val = $('search-input').value.trim();
         if (val) doSearch(val, mode);
     };
 
-    const inputs = [$('search-input'), $('results-input')];
-    inputs.forEach(input => {
-        if (!input) return;
+    const input = $('search-input');
+    if (input) {
         input.onkeydown = e => {
-            if (e.key === 'Enter') { e.preventDefault(); handleS('fuzzy'); } // Default fuzzy
+            if (e.key === 'Enter') { e.preventDefault(); handleS('fuzzy'); }
         };
         input.onfocus = () => HistoryManager.show();
         input.onblur = () => HistoryManager.hide();
-    });
+    }
 
     if ($('search-fuzzy-btn')) $('search-fuzzy-btn').onclick = () => handleS('fuzzy');
     if ($('search-exact-btn')) $('search-exact-btn').onclick = () => handleS('exact');
-    if ($('results-search-btn')) $('results-search-btn').onclick = () => handleS('fuzzy');
-    if ($('back-btn')) $('back-btn').onclick = showSearch;
-    if ($('refresh-discovery')) $('refresh-discovery').onclick = () => CacheManager.refreshAll();
+    if ($('refresh-hot')) $('refresh-hot').onclick = () => loadHotKeywords(true);
 
     document.querySelectorAll('#main-filter .tag').forEach(tag => {
         tag.onclick = () => UISync.handleFilterClick(tag);
@@ -189,7 +170,13 @@ async function loadHotKeywords(force = false) {
             }
         } catch (e) { }
     }
-    if (kw) UISync.renderHotTags(kw);
+    if (kw && kw.length) {
+        UISync.renderHotTags(kw);
+        const input = $('search-input');
+        if (input && !input.value) {
+            input.placeholder = `尝试搜搜 "${kw[0]}"...`;
+        }
+    }
 }
 
 async function loadDiscovery(force = false) {
@@ -213,13 +200,27 @@ async function loadDiscovery(force = false) {
 
 function renderColumnList(container, items) {
     if (!container) return;
-    if (!items || !items.length) { container.innerHTML = '<div class="empty-state">暂无资源</div>'; return; }
-    container.innerHTML = items.map(item => `
-        <div class="latest-item" onclick="doSearch('${escAttr(item.note)}', 'fuzzy')">
-            <span class="type-dot dot-${item.driveType || 'default'}"></span>
-            <span class="latest-item-name" title="${escAttr(item.note)}">${escHtml(item.note)}</span>
-            <span class="latest-item-meta">${item.datetime ? item.datetime.split('T')[0].slice(5) : ''}</span>
-        </div>`).join('');
+    if (!items || !items.length) { container.innerHTML = '<span class="empty-state" style="font-size:0.8rem">暂无资源</span>'; return; }
+    container.innerHTML = items.map(item => `<a href="${escAttr(item.url)}" target="_blank" class="hot-pill" title="${escAttr(item.note)}">${escHtml(item.note)}</a>`).join('');
+}
+
+async function loadDiscoverySingle(catId) {
+    const cat = DISCOVERY_CATS.find(c => c.id === catId);
+    if (!cat) return;
+    const el = $(`list-${catId}`);
+    if (el) el.innerHTML = '<div class="loading-spinner mini"></div>';
+    try {
+        const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(cat.kw)}`);
+        if (html) {
+            const items = parsePanSearchHtml(html).slice(0, 8);
+            let cached = CacheManager.get('discovery') || {};
+            cached[catId] = items;
+            CacheManager.save('discovery', cached);
+            renderColumnList(el, items);
+        }
+    } catch (e) {
+        if (el) el.innerHTML = '<span class="empty-state" style="font-size:0.8rem">加载失败</span>';
+    }
 }
 
 // ─── SEARCH ENGINE ────────────────────────────────────────────────────────────
@@ -228,17 +229,17 @@ async function doSearch(keyword, mode = 'fuzzy') {
     isSearching = true;
     keyword = keyword.trim();
     $('search-input').value = keyword;
-    if ($('results-input')) $('results-input').value = keyword;
 
     HistoryManager.add(keyword);
     HistoryManager.hide();
 
-    const vr = $('view-results');
-    if (!vr.classList.contains('active')) {
-        showResults();
-    }
-
     setSearchLoading(true);
+
+    // Smooth scroll down to results
+    setTimeout(() => {
+        const grid = $('results-grid');
+        if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
 
     try {
         let results = [];
@@ -358,22 +359,17 @@ function renderSingleCard(item, idx) {
 
 function showSearch() {
     $('view-search').classList.add('active');
-    $('view-results').classList.remove('active');
     allResults = [];
-    UISync.syncFilters();
 }
 
 function showResults() {
-    $('view-search').classList.remove('active');
-    $('view-results').classList.add('active');
     $('results-grid').innerHTML = '';
-    UISync.syncFilters();
 }
 
 function setSearchLoading(on) {
-    $('search-fuzzy-btn').disabled = on; $('search-exact-btn').disabled = on;
-    if ($('results-search-btn')) $('results-search-btn').disabled = on;
-    if (on) $('results-grid').innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><p>正在智能抓取全网高质量资源...</p></div>`;
+    if ($('search-fuzzy-btn')) $('search-fuzzy-btn').disabled = on;
+    if ($('search-exact-btn')) $('search-exact-btn').disabled = on;
+    if (on) $('results-grid').innerHTML = `<div class="loading-state" style="margin-top:24px"><div class="loading-spinner"></div><p>正在智能抓取全网高质量资源...</p></div>`;
 }
 
 async function fetchWithProxy(url) {
@@ -411,4 +407,4 @@ function toast(m, t = 'info') {
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
-window.doSearch = doSearch; window.HistoryManager = HistoryManager; window.toggleGroup = toggleGroup; window.copyUrl = copyUrl; window.showSearch = showSearch; window.CacheManager = CacheManager;
+window.doSearch = doSearch; window.HistoryManager = HistoryManager; window.toggleGroup = toggleGroup; window.copyUrl = copyUrl; window.CacheManager = CacheManager; window.loadDiscoverySingle = loadDiscoverySingle;
