@@ -348,8 +348,8 @@ async function loadLatestFeed(type = 'all') {
     if (discovery) discovery.style.display = 'none';
 
     try {
-        // V25: Parallel fetch for a much deeper discovery pool (Pages 1-5)
-        const pages = [1, 2, 3, 4, 5];
+        // V25: Parallel fetch for a much deeper discovery pool (Pages 1-10)
+        const pages = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         const fetchPromises = pages.map(p => fetchWithProxy(`https://s.panhunt.com/api/search?q=&page=${p}&limit=50&sort=new`));
         const responses = await Promise.all(fetchPromises);
 
@@ -379,10 +379,14 @@ async function loadLatestFeed(type = 'all') {
             return 'other';
         };
 
-        let feed = records.map(item => ({
-            ...item,
-            driveType: mapType(item.url)
-        }));
+        let feed = records.map(item => {
+            const title = (item.note || item.title || item.note_ext || "").trim();
+            return {
+                ...item,
+                note: title || "最新云盘资源",
+                driveType: mapType(item.url)
+            };
+        });
 
         if (type !== 'all') {
             feed = feed.filter(it => it.driveType === type);
@@ -487,44 +491,39 @@ async function doSearch(keyword, mode = 'fuzzy') {
             const matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
             const matchesAlias = aliases.some(a => note.includes(a));
 
-            // Layer 3 & 4: Scoring & Penalty System --- ADAPTIVE MODE ---
+            // --- Scoring & Filtering Protocol ---
             let score = 0;
             const isPrecise = mode === 'precise';
 
-            // Standard Fuzzy Rule: At least some keyword overlap is required for search mode
+            // Standard Fuzzy Rule: Enforce overlap for search keywords
             if (!matchesAny && !matchesAlias && !isGeneric) return;
 
             if (isGeneric) {
                 if (isPrecise) return;
                 score = -80;
             } else {
-                // Standard Scoring (Proximity & completeness)
-                if (note === kwLower) score += 300; // King
-                else if (note.includes(kwLower)) score += 150; // Full sequence found
-                else if (matchesAll) score += 100; // All parts found but separated
-                else if (matchesAny) score += 40; // Some parts found
+                // Standard Scoring Protocol
+                if (note === kwLower) score += 500; // Perfect
+                else if (note.startsWith(kwLower)) score += 300; // Sequence start
+                else if (note.includes(kwLower)) score += 200; // Sequence contains
+                else if (matchesAll) score += 150; // All parts present
+                else if (matchesAny) score += 50; // Partial parts
 
-                if (matchesAlias) score += 60;
+                if (matchesAlias) score += 80;
 
-                // Density Boost: Favor titles where the keyword occupies a larger percentage
-                const density = kwLower.length / note.length;
+                // Title Density Boost (Shorter titles with match rank higher)
+                const density = kwLower.length / Math.max(1, note.length);
                 score += Math.round(density * 100);
 
-                // Start-of-string boost
-                if (note.startsWith(kwLower)) score += 40;
-
-                // PRECISE MODE EXTRA FILTERING
-                if (isPrecise) {
-                    // In precise mode, we strictly require the full sequence OR all fragments
-                    if (!note.includes(kwLower) && !matchesAll) return;
-                }
+                // Precise Mode Termination
+                if (isPrecise && !note.includes(kwLower) && !matchesAll) return;
             }
 
-            // Language Characteristic Penalty
+            // Language Consistency
             const resultHasEnglish = /[a-z]/.test(note);
             if (queryHasEnglish && !resultHasEnglish && !matchesAny) {
                 if (isPrecise) return;
-                score -= 400;
+                score -= 300;
             }
 
             // Quality/Metadata Boosting
@@ -600,7 +599,9 @@ function parsePanSearchHtml(html) {
         const lookBack = html.substring(Math.max(0, pos - 600), pos);
         const h5Match = lookBack.match(/<h5[^>]*>(.*?)<\/h5>/i);
         const listMatch = lookBack.match(/(\d+、|【)(.*?)(:|<|\n|】)/i);
-        let title = (h5Match ? h5Match[1] : (listMatch ? listMatch[2] : "未知资源")).replace(/<[^>]+>/g, '').trim();
+        const textPre = lookBack.substring(lookBack.lastIndexOf('>') + 1).trim();
+        let title = (h5Match ? h5Match[1] : (listMatch ? listMatch[2] : (textPre || "未知资源"))).replace(/<[^>]+>/g, '').trim();
+        if (title.length < 2) title = "网盘资源";
 
         let driveType = 'other';
         if (url.includes('quark')) driveType = 'quark';
@@ -798,10 +799,6 @@ async function fetchWithProxy(url) {
     return null;
 }
 
-function toggleGroup(gid) {
-    const h = $(`${gid}-h`), b = $(`${gid}-b`);
-    if (h && b) { const active = h.classList.toggle('active'); b.textContent = active ? '收起结果' : `展开其余 (${h.children.length})`; }
-}
 
 async function quarkSave(u) {
     const m = u.match(/\/s\/([a-zA-Z0-9]+)/);
