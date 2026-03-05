@@ -401,28 +401,26 @@ async function doSearch(keyword, mode = 'fuzzy') {
             const matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
             const matchesAlias = aliases.some(a => note.includes(a));
 
-            // Layer 3 & 4: Scoring & Penalty System
+            // Layer 3 & 4: Scoring & Penalty System --- STRICT MODE ---
             let score = 0;
 
-            if (isGeneric) {
-                // Keep generic titles but rank them low
-                score = -80;
-            } else if (!matchesAny && !matchesAlias) {
-                // Zero keyword overlap (fuzzy match from backend)
-                score = -100;
-            } else {
-                // Positive Scoring
-                if (note === kwLower) score += 100; // Perfect exact mirror title
-                if (matchesAll) score += 60; // Every word fragment is in the title
-                if (note.startsWith(kwLower)) score += 40; // Starts with it
-                if (matchesAny && !matchesAll) score += 20; // At least one word fragment is present
-                if (matchesAlias) score += 30; // Matches known alias/pinyin
-            }
+            if (isGeneric) return; // Drop unknown/placeholder titles
 
-            // Language Characteristic Penalty (e.g., query "sss" but result "甄嬛传")
+            // Hard Filter: If it doesn't match the keyword OR an alias, drop it immediately
+            if (!matchesAny && !matchesAlias) return;
+
+            // Positive Scoring for actual matches
+            if (note === kwLower) score += 200; // Exact match is king
+            if (matchesAll) score += 100; // Every word fragment found
+            if (note.startsWith(kwLower)) score += 50;
+            if (matchesAny && !matchesAll) score += 30;
+            if (matchesAlias) score += 50;
+
+            // Language Characteristic Penalty (Double check)
             const resultHasEnglish = /[a-z]/.test(note);
-            if (queryHasEnglish && !resultHasEnglish) {
-                score -= 300; // Drastic penalty for language mismatch on english queries
+            if (queryHasEnglish && !resultHasEnglish && !matchesAny) {
+                // If query is English but result is Chinese and doesn't contain any query words
+                return;
             }
 
             // Quality/Metadata Boosting
