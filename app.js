@@ -140,6 +140,41 @@ const HistoryManager = {
     hide() { setTimeout(() => { if ($('history-dropdown')) $('history-dropdown').style.display = 'none'; }, 200); }
 };
 
+// ─── SUGGESTION MANAGER ───────────────────────────────────────────────────────
+const SuggestionManager = {
+    timer: null,
+    fetch(kw) {
+        clearTimeout(this.timer);
+        if (!kw.trim()) {
+            this.hide();
+            return;
+        }
+        this.timer = setTimeout(() => {
+            const script = document.createElement('script');
+            window.__bdCb = (data) => {
+                this.render(data.s || []); // Baidu SUG returns array in data.s
+                script.remove();
+            };
+            script.src = `https://sp0.baidu.com/5a1Fazu8AA54nxGko9WTAnF6hhy/su?wd=${encodeURIComponent(kw)}&cb=window.__bdCb`;
+            document.body.appendChild(script);
+        }, 300); // 300ms debounce
+    },
+    render(list) {
+        const dropdown = $('suggestion-dropdown'), listEl = $('suggestion-list');
+        if (!dropdown || !listEl) return;
+        if (!list.length) { dropdown.style.display = 'none'; return; }
+        listEl.innerHTML = list.map(k => `
+            <div class="suggestion-item" onclick="doSearch('${escAttr(k)}')">
+                <svg class="suggestion-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <span class="text">${escHtml(k)}</span>
+            </div>`).join('');
+        dropdown.style.display = 'block';
+    },
+    hide() {
+        setTimeout(() => { if ($('suggestion-dropdown')) $('suggestion-dropdown').style.display = 'none'; }, 200);
+    }
+};
+
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 (function init() {
     bindEvents();
@@ -161,17 +196,30 @@ function bindEvents() {
             if (e.key === 'Enter') { e.preventDefault(); handleS(); }
         };
         input.oninput = () => {
-            if (!input.value.trim()) {
-                const discovery = $('discovery');
+            const val = input.value.trim();
+            if (!val) {
+                const discovery = $('discovery-area');
                 if (discovery) discovery.style.display = 'flex';
                 const header = $('hero-header');
                 if (header) header.classList.remove('collapsed');
                 const results = $('results-grid');
                 if (results) results.innerHTML = '';
+                SuggestionManager.hide();
+                HistoryManager.show();
+            } else {
+                HistoryManager.hide();
+                SuggestionManager.fetch(val);
             }
         };
-        input.onfocus = () => HistoryManager.show();
-        input.onblur = () => HistoryManager.hide();
+        input.onfocus = () => {
+            const val = input.value.trim();
+            if (!val) HistoryManager.show();
+            else SuggestionManager.fetch(val);
+        };
+        input.onblur = () => {
+            HistoryManager.hide();
+            SuggestionManager.hide();
+        };
     }
 
     if ($('search-btn')) $('search-btn').onclick = () => handleS();
