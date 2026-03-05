@@ -782,25 +782,26 @@ h1 {
     display: flex;
 }
 
-/* ===== RESULT CARD ===== */
-.card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 16px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+/* ===== RESULT LIST ITEM ===== */
+.list-item {
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    padding: 16px 8px;
     transition: all .2s var(--ease);
     animation: fade-up .3s var(--ease) backwards;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
+    cursor: pointer;
 }
 
-.card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(129, 140, 248, .4);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
+.list-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom-color: rgba(129, 140, 248, 0.3);
+}
+
+.list-item:last-child {
+    border-bottom: none;
 }
 
 @keyframes fade-up {
@@ -815,98 +816,98 @@ h1 {
     }
 }
 
-/* Horizontal card: left badge, center body, right actions */
-.card-top {
-    display: none;
-}
-
-/* not used in list mode */
-
-.card-body {
+.list-item-body {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
 }
 
-.drive-badge {
-    font-size: .68rem;
-    font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 6px;
-    text-transform: uppercase;
-    letter-spacing: .5px;
-}
-
-.badge-quark {
-    background: #00be64;
-    color: #fff;
-}
-
-.badge-baidu {
-    background: #3370ff;
-    color: #fff;
-}
-
-.badge-aliyun {
-    background: #ff6a00;
-    color: #fff;
-}
-
-.badge-uc {
-    background: #f7b500;
-    color: #000;
-}
-
-.badge-115 {
-    background: #1ec5ff;
-    color: #000;
-}
-
-.badge-pikpak {
-    background: #a855f7;
-    color: #fff;
-}
-
-.badge-other {
-    background: #475569;
-    color: #fff;
-}
-
-.status-chip {
-    font-size: .72rem;
-    margin-left: auto;
-}
-
-.chip-valid {
-    color: var(--success);
-}
-
-.chip-invalid {
-    color: var(--danger);
-}
-
-.card-name {
-    font-size: .92rem;
-    font-weight: 600;
+.list-item-title {
+    font-size: 1rem;
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    margin-bottom: 3px;
+    color: var(--text);
+    text-align: left;
 }
 
-.card-meta {
-    font-size: .74rem;
-    color: var(--muted);
+.list-item-meta {
     display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--muted);
     flex-wrap: wrap;
-    gap: 10px;
 }
 
-.card-clickable {
-    cursor: pointer;
+.meta-divider {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 0.75rem;
 }
 
-.card-clickable:hover {
-    background: rgba(40, 50, 70, .8);
+/* Text Drive Badges */
+.drive-badge-text {
+    font-weight: 600;
+}
+
+.badge-text-quark {
+    color: #00be64;
+}
+
+.badge-text-baidu {
+    color: #3370ff;
+}
+
+.badge-text-aliyun {
+    color: #ff6a00;
+}
+
+.badge-text-uc {
+    color: #f7b500;
+}
+
+.badge-text-115 {
+    color: #1ec5ff;
+}
+
+.badge-text-pikpak {
+    color: #a855f7;
+}
+
+.badge-text-xunlei {
+    color: #3370ff;
+}
+
+.badge-text-mobile {
+    color: #0085cf;
+}
+
+.badge-text-telecom {
+    color: #005bac;
+}
+
+.badge-text-other {
+    color: #94a3b8;
+}
+
+/* Validity Indicator */
+.validity-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    color: #10b981;
+    /* Default to success green */
+}
+
+.valid-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #10b981;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
 }
 
 .btn-icon {

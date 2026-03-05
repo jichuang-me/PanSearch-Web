@@ -321,11 +321,18 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
             // Stage 1: smart relevance check (multi-keyword)
             const isGeneric = note === "未知资源" || note === "";
+            // We relax the filter to allow partial matches if the backend returned it, 
+            // but we boost the score if it matches all query fragments perfectly.
             const matchesAll = isGeneric || kws.every(k => note.includes(k) || kwLower.includes(note));
-            if (!matchesAll) return;
+            const matchesAny = isGeneric || kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
+
+            // If it doesn't match ANY keyword part, we still might allow it if it came from the API 
+            // since the API sometimes returns semantic results. But let's require at least some match to avoid total garbage.
+            if (!isGeneric && !matchesAny) return;
 
             // Stage 2: Quality/Recency Scoring
             let score = 0;
+            if (matchesAll) score += 20; // Boost perfect matches
             if (note === kwLower) score += 50; // Exact title match
             if (note.startsWith(kwLower)) score += 30;
             if (item.driveType === 'quark') score += 10; // User preferred platform
@@ -335,8 +342,9 @@ async function doSearch(keyword, mode = 'fuzzy') {
                 const dt = new Date(item.datetime);
                 if (!isNaN(dt.getTime())) {
                     const daysOld = (new Date() - dt) / (1000 * 3600 * 24);
-                    if (daysOld < 7) score += 20; // Very fresh (latest)
-                    else if (daysOld < 30) score += 10;
+                    if (daysOld < 7) score += 30; // Very fresh (latest)
+                    else if (daysOld < 30) score += 15;
+                    else if (daysOld > 365) score -= 10; // Penalize old resources slightly
                 }
             }
 
@@ -448,15 +456,23 @@ function renderCards(list) {
 function renderSingleCard(item, idx) {
     const type = item.driveType || 'other';
     const clickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
+    const driveName = DRIVE_NAMES[type] || '其他网盘';
+
+    // UI Feedback: List format with Left-aligned title and small drive name below
     return `
-        <div class="card card-clickable" style="margin-bottom:10px; animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${clickAction}">
-            <span class="drive-badge badge-${['quark', 'baidu', 'aliyun', 'uc', 'xunlei', 'mobile', 'telecom', 'pikpak', '115'].includes(type) ? type : 'other'}">${escHtml(type)}</span>
-            <div class="card-body">
-                <div class="card-name" title="${escAttr(item.note)}">${escHtml(item.note)}</div>
-                <div class="card-meta"><span>📅 ${item.datetime ? item.datetime.split('T')[0] : '未知'}</span></div>
+        <div class="list-item" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${clickAction}">
+            <div class="list-item-body">
+                <div class="list-item-title" title="${escAttr(item.note)}">${escHtml(item.note)}</div>
+                <div class="list-item-meta">
+                    <span class="drive-badge-text badge-text-${type}">${escHtml(driveName)}</span>
+                    <span class="meta-divider">|</span>
+                    <span class="validity-indicator"><span class="valid-dot"></span>有效资源</span>
+                    <span class="meta-divider">|</span>
+                    <span>📅 ${item.datetime ? item.datetime.split('T')[0] : '未知'}</span>
+                </div>
             </div>
-            <button class="btn-icon" title="复制" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+            <button class="btn-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
         </div>`;
 }
