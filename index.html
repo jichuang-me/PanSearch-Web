@@ -38,28 +38,30 @@
                     <button class="tag" data-type="baidu">百度</button>
                     <button class="tag" data-type="aliyun">阿里</button>
                     <button class="tag" data-type="uc">UC</button>
-                    <button class="tag" data-type="115">115</button>
+                    <button class="tag" data-type="xunlei">迅雷</button>
+                    <button class="tag" data-type="mobile">移动</button>
+                    <button class="tag" data-type="telecom">天翼</button>
                     <button class="tag" data-type="pikpak">PikPak</button>
                 </div>
             </div>
 
-            <!-- Discovery (hot + latest, shown before first search) -->
+            <!-- Discovery (hot + latest) -->
             <div id="discovery" class="discovery">
                 <div class="disc-section">
                     <h3>🔥 热门搜索</h3>
-                    <div id="hot-tags" class="hot-tags">
-                        <span class="skel-pill"></span><span class="skel-pill"></span>
-                        <span class="skel-pill"></span><span class="skel-pill"></span>
-                        <span class="skel-pill"></span><span class="skel-pill"></span>
-                    </div>
+                    <div id="hot-tags" class="hot-tags"></div>
                 </div>
                 <div class="disc-section">
                     <h3>✨ 最新资源 <span class="live">LIVE</span></h3>
+                    <div class="disc-tabs">
+                        <button class="disc-tab active" data-cat="all">推荐</button>
+                        <button class="disc-tab" data-cat="movie">影视</button>
+                        <button class="disc-tab" data-cat="music">音乐</button>
+                        <button class="disc-tab" data-cat="software">软件</button>
+                        <button class="disc-tab" data-cat="doc">资料</button>
+                    </div>
                     <div id="latest-list" class="latest-list">
-                        <div class="skel-row"></div>
-                        <div class="skel-row"></div>
-                        <div class="skel-row"></div>
-                        <div class="skel-row"></div>
+                        <div class="loading-spinner mini"></div>
                     </div>
                 </div>
             </div>
