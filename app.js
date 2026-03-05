@@ -822,32 +822,20 @@ function toggleGroup(gid) {
         const list = GroupCache[gid];
         if (!list.length) return;
 
-        const toShow = list.slice(0, 30);
-        const remaining = list.slice(30);
+        const toShow = list.slice(0, 10);
+        const remaining = list.slice(10);
 
         v.innerHTML += toShow.map((it, idx) => renderSingleCard(it, idx + 50)).join('');
         GroupCache[gid] = remaining;
 
         if (remaining.length) {
             b.textContent = `加载更多... (${remaining.length})`;
-            setupObserver(gid);
         } else {
             b.style.display = 'none';
         }
     }
 }
 
-function setupObserver(gid) {
-    const btn = $(`${gid}-b`);
-    if (!btn) return;
-    const observer = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-            observer.disconnect();
-            toggleGroup(gid);
-        }
-    }, { rootMargin: '600px' });
-    observer.observe(btn);
-}
 
 function showSearch() {
     $('view-search').classList.add('active');
