@@ -231,17 +231,28 @@ function bindEvents() {
 
     if ($('search-btn')) $('search-btn').onclick = () => handleS();
 
+    const preciseCheck = $('precise-check');
+    if (preciseCheck) {
+        preciseCheck.onchange = () => {
+            if (allResults.length) {
+                renderCards(allResults);
+                const bar = $('search-bar');
+                if (bar) bar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        };
+    }
+
     document.querySelectorAll('#main-filter .tag').forEach(tag => {
         tag.onclick = () => {
             const val = $('search-input').value.trim();
+            document.querySelectorAll('#main-filter .tag').forEach(t => t.classList.remove('active'));
+            tag.classList.add('active');
+            activeType = tag.getAttribute('data-type');
+
             if (!val) {
-                // Feature: Empty search feed
-                document.querySelectorAll('#main-filter .tag').forEach(t => t.classList.remove('active'));
-                tag.classList.add('active');
-                activeType = tag.getAttribute('data-type');
                 loadLatestFeed(activeType);
             } else {
-                UISync.handleFilterClick(tag);
+                renderCards(allResults);
             }
         };
     });
@@ -331,32 +342,40 @@ async function loadLatestFeed(type = 'all') {
     const grid = $('results-grid');
     if (!grid) return;
 
-    grid.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>正在为您获取最新热门资源...</p></div>';
+    grid.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>正在为您获取并聚合最新云盘资源...</p></div>';
     $('hero-header').classList.add('collapsed');
     const discovery = $('discovery-area');
     if (discovery) discovery.style.display = 'none';
 
     try {
-        // Fetch hot data from Multiple pages if possible, here we take a large batch
-        const res = await fetchWithProxy('https://s.panhunt.com/api/search?q=&page=1&limit=150');
+        // V25: Parallel fetch for a much deeper discovery pool (Pages 1-5)
+        const pages = [1, 2, 3, 4, 5];
+        const fetchPromises = pages.map(p => fetchWithProxy(`https://s.panhunt.com/api/search?q=&page=${p}&limit=50&sort=new`));
+        const responses = await Promise.all(fetchPromises);
+
         let records = [];
-        if (res && res.data && res.data.merged_by_type) {
-            Object.values(res.data.merged_by_type).forEach(list => records = records.concat(list));
-        } else if (res && Array.isArray(res.data)) {
-            records = res.data;
-        }
+        responses.forEach(res => {
+            if (res && res.data) {
+                if (res.data.merged_by_type) {
+                    Object.values(res.data.merged_by_type).forEach(list => records = records.concat(list));
+                } else if (Array.isArray(res.data)) {
+                    records = records.concat(res.data);
+                }
+            }
+        });
 
         const mapType = (url) => {
             if (!url) return 'other';
-            if (url.includes('quark')) return 'quark';
-            if (url.includes('baidu')) return 'baidu';
-            if (url.includes('alipan') || url.includes('aliyundrive')) return 'aliyun';
-            if (url.includes('drive.uc.cn')) return 'uc';
-            if (url.includes('pan.xunlei.com')) return 'xunlei';
-            if (url.includes('yun.139.com')) return 'mobile';
-            if (url.includes('cloud.189.cn')) return 'telecom';
-            if (url.includes('mypikpak.com')) return 'pikpak';
-            if (url.includes('115.com')) return '115';
+            const u = url.toLowerCase();
+            if (u.includes('quark.cn')) return 'quark';
+            if (u.includes('pan.baidu.com')) return 'baidu';
+            if (u.includes('alipan.com') || u.includes('aliyundrive.com')) return 'aliyun';
+            if (u.includes('uc.cn')) return 'uc';
+            if (u.includes('xunlei.com')) return 'xunlei';
+            if (u.includes('139.com')) return 'mobile';
+            if (u.includes('189.cn')) return 'telecom';
+            if (u.includes('pikpak') || u.includes('mypikpak')) return 'pikpak';
+            if (u.includes('115.com')) return '115';
             return 'other';
         };
 
@@ -472,26 +491,40 @@ async function doSearch(keyword, mode = 'fuzzy') {
             let score = 0;
             const isPrecise = mode === 'precise';
 
+            // Standard Fuzzy Rule: At least some keyword overlap is required for search mode
+            if (!matchesAny && !matchesAlias && !isGeneric) return;
+
             if (isGeneric) {
-                if (isPrecise) return; // Drop unknown in precise mode
+                if (isPrecise) return;
                 score = -80;
-            } else if (!matchesAny && !matchesAlias) {
-                if (isPrecise) return; // Hard drop if no keyword match in precise mode
-                score = -100; // Penalty but keep in fuzzy mode
             } else {
-                // Positive Scoring for actual matches
-                if (note === kwLower) score += 200;
-                if (matchesAll) score += 100;
-                if (note.startsWith(kwLower)) score += 50;
-                if (matchesAny && !matchesAll) score += 30;
-                if (matchesAlias) score += 50;
+                // Standard Scoring (Proximity & completeness)
+                if (note === kwLower) score += 300; // King
+                else if (note.includes(kwLower)) score += 150; // Full sequence found
+                else if (matchesAll) score += 100; // All parts found but separated
+                else if (matchesAny) score += 40; // Some parts found
+
+                if (matchesAlias) score += 60;
+
+                // Density Boost: Favor titles where the keyword occupies a larger percentage
+                const density = kwLower.length / note.length;
+                score += Math.round(density * 100);
+
+                // Start-of-string boost
+                if (note.startsWith(kwLower)) score += 40;
+
+                // PRECISE MODE EXTRA FILTERING
+                if (isPrecise) {
+                    // In precise mode, we strictly require the full sequence OR all fragments
+                    if (!note.includes(kwLower) && !matchesAll) return;
+                }
             }
 
             // Language Characteristic Penalty
             const resultHasEnglish = /[a-z]/.test(note);
             if (queryHasEnglish && !resultHasEnglish && !matchesAny) {
-                if (isPrecise) return; // Stricter in precise mode
-                score -= 400; // Heavy penalty in fuzzy mode
+                if (isPrecise) return;
+                score -= 400;
             }
 
             // Quality/Metadata Boosting
@@ -509,7 +542,7 @@ async function doSearch(keyword, mode = 'fuzzy') {
                 const ageDays = (Date.now() - new Date(item.datetime).getTime()) / (1000 * 3600 * 24);
                 if (ageDays <= 3) score += 30;
                 else if (ageDays <= 30) score += 10;
-                else if (ageDays > 365) score -= 10; // Penalize very old links slightly
+                else if (ageDays > 365) score -= 10;
             }
 
             // Save and Push
@@ -588,13 +621,27 @@ function parsePanSearchHtml(html) {
 
 // ─── UI HELPERS ──────────────────────────────────────────────────────────────
 function renderCards(list) {
-    const filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
+    const isPrecise = $('precise-check')?.checked || false;
+    const kw = $('search-input').value.trim().toLowerCase();
+
+    // UI Filter + Strict Matching Filter
+    let filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
+
+    if (isPrecise && kw) {
+        const kws = kw.split(/\s+/).filter(Boolean);
+        filtered = filtered.filter(item => {
+            const note = (item.title || item.note || '').toLowerCase();
+            return note.includes(kw) || (kws.length > 0 && kws.every(k => note.includes(k)));
+        });
+    }
+
     const grid = $('results-grid');
     if (!grid) return;
     const infoEl = $('result-info');
-    if (infoEl) infoEl.textContent = filtered.length ? `为你搜索到 ${filtered.length} 条资源` : '未发现有效链接';
+    if (infoEl) infoEl.textContent = filtered.length ? `为你展示 ${filtered.length} 条资源` : '未发现匹配资源';
+
     if (!filtered.length) {
-        grid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>换个关键词试试？</p></div>`;
+        grid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>${isPrecise ? '精确模式下未匹配到结果，可尝试关闭有效性筛选' : '换个关键词试试？'}</p></div>`;
         return;
     }
     const groups = {};
@@ -612,16 +659,22 @@ function renderCards(list) {
                 <div class="group-visible" id="${gid}-v">${visible.map((it, idx) => renderSingleCard(it, idx)).join('')}</div>
                 ${hidden.length ? `
                     <div id="${gid}-h" class="hidden-results" data-full-list='${escAttr(JSON.stringify(hidden))}'></div>
-                    <button class="show-more-btn" onclick="toggleGroup('${gid}')" id="${gid}-b">展开其余 (${hidden.length})</button>
+                    <button class="show-more-btn" onclick="toggleGroup('${gid}')" id="${gid}-b">加载更多... (${hidden.length})</button>
                 ` : ''}
             </div>`;
     }).join('');
 
-    // Add Scroll Listener for infinite scroll on expanded groups
-    // The user said "打开折叠的时候，通过滚动自动加载"
-    // This logic is now handled within toggleGroup using IntersectionObserver.
-    // The previous window.onscroll block was commented out and not fully implemented,
-    // so it's removed to avoid confusion.
+    // Seamless Infinite Scroll for all groups
+    document.querySelectorAll('.show-more-btn').forEach(btn => {
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                observer.disconnect();
+                const gid = btn.id.replace('-b', '');
+                toggleGroup(gid);
+            }
+        }, { rootMargin: '400px' });
+        observer.observe(btn);
+    });
 }
 
 function renderSingleCard(item, idx) {

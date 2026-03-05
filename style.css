@@ -216,11 +216,9 @@ h1 {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid var(--border);
-    border-radius: 100px;
-    backdrop-filter: blur(12px);
+    padding: 8px 4px;
+    background: transparent;
+    border: none;
     user-select: none;
     cursor: pointer;
     white-space: nowrap;
