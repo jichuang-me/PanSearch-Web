@@ -272,20 +272,44 @@ async function doSearch(keyword, mode = 'fuzzy') {
     }, 150);
 
     try {
-        let results = [];
-        // Sequential fetch with abort logic
+        // Parallel fetch with abort logic
         const pages = [1, 2, 3, 4];
-        for (let p of pages) {
-            if (signal.aborted) return;
-            const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}&page=${p}`);
-            if (signal.aborted) return;
+        const fetchPromises = pages.map(p =>
+            fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}&page=${p}`)
+        );
+
+        const htmlResults = await Promise.all(fetchPromises);
+        if (signal.aborted) return;
+
+        let results = [];
+        htmlResults.forEach(html => {
             if (html) results = results.concat(parsePanSearchHtml(html));
-        }
-        // Deduplicate
-        results = Array.from(new Set(results.map(a => a.url))).map(url => results.find(a => a.url === url));
+        });
+
+        // Deduplicate and Quality Filter
+        const uniqueResults = [];
+        const seenUrls = new Set();
+
+        results.forEach(item => {
+            if (!seenUrls.has(item.url)) {
+                // High quality filter: title matches keyword or interesting parts
+                const titleLower = item.note.toLowerCase();
+                const kwLower = keyword.toLowerCase();
+                if (titleLower.includes(kwLower) || kwLower.includes(titleLower)) {
+                    item.score = 10;
+                } else {
+                    item.score = 5;
+                }
+                uniqueResults.push(item);
+                seenUrls.add(item.url);
+            }
+        });
+
+        // Sort by score (quality) then by date (if possible)
+        uniqueResults.sort((a, b) => b.score - a.score);
 
         if (signal.aborted) return;
-        allResults = results || [];
+        allResults = uniqueResults || [];
         renderCards(allResults);
     } catch (e) {
         if (e.name === 'AbortError') return;

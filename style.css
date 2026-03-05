@@ -177,7 +177,7 @@ h1 {
 }
 
 .search-btn-minimal button {
-    background: transparent;
+    background: transparent !important;
     color: var(--primary);
     border: none;
     font-size: 1.2rem;
@@ -191,7 +191,7 @@ h1 {
 }
 
 .search-btn-minimal button:hover {
-    background: rgba(129, 140, 248, 0.1);
+    background: transparent !important;
     color: var(--primary-2);
     transform: scale(1.1) rotate(5deg);
 }
