@@ -195,7 +195,7 @@ async function loadHotKeywords(force = false) {
         UISync.renderHotTags(kw);
         const input = $('search-input');
         if (input && !input.value) {
-            input.placeholder = `尝试搜搜 "${kw[0]}"...`;
+            input.placeholder = `🔥 正在热搜："${kw[0]}"`;
         }
     }
 }
@@ -238,6 +238,7 @@ async function loadDiscoverySingle(catId) {
             cached[catId] = items;
             CacheManager.save('discovery', cached);
             renderColumnList(el, items);
+            toast('已更新最新资源', 'success');
         }
     } catch (e) {
         if (el) el.innerHTML = '<span class="empty-state" style="font-size:0.8rem">加载失败</span>';

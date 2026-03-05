@@ -164,26 +164,29 @@ h1 {
     background: transparent;
     color: var(--primary);
     border: none;
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1.2rem;
     cursor: pointer;
-    transition: all 0.2s;
-    padding: 8px;
+    transition: all 0.25s var(--ease);
+    padding: 10px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    white-space: nowrap;
 }
 
 .search-btn-minimal button:hover {
-    background: transparent;
+    background: rgba(129, 140, 248, 0.1);
     color: var(--primary-2);
-    transform: scale(1.1);
+    transform: scale(1.1) rotate(5deg);
 }
 
 .search-btn-minimal button svg {
-    stroke: var(--primary);
+    stroke: currentColor;
+    transition: transform 0.25s var(--ease);
+}
+
+.search-btn-minimal button:active {
+    transform: scale(0.95);
 }
 
 .btn-sep {
@@ -496,10 +499,11 @@ h1 {
 .disc-col-inline {
     display: flex;
     align-items: center;
-    gap: 0;
-    padding: 12px 0;
+    padding: 14px 0;
     width: 100%;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    /* Contain scrollable area */
 }
 
 .disc-col-inline:last-child {
@@ -511,21 +515,41 @@ h1 {
     font-weight: 600;
     color: var(--muted);
     flex-shrink: 0;
-    margin-right: 8px;
+    margin-right: 12px;
+    min-width: 80px;
+}
+
+.disc-col-inline .hot-tags {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    gap: 16px;
+    padding-right: 40px;
+    /* Space for refresh button */
+    mask-image: linear-gradient(to right, black 85%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, black 85%, transparent 100%);
+}
+
+.disc-col-inline .hot-tags::-webkit-scrollbar {
+    display: none;
 }
 
 .refresh-link-inline {
-    font-size: 0.8rem;
+    font-size: 0.9rem;
     cursor: pointer;
-    margin-left: auto;
-    opacity: 0.5;
-    transition: opacity 0.2s;
+    flex-shrink: 0;
+    margin-left: 8px;
+    opacity: 0.4;
+    transition: all 0.2s;
     padding: 4px;
+    filter: grayscale(1);
 }
 
 .refresh-link-inline:hover {
     opacity: 1;
-    color: var(--primary);
+    filter: grayscale(0);
+    transform: rotate(180deg);
 }
 
 /* Hot tags */
