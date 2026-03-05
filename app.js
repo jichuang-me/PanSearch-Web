@@ -231,7 +231,18 @@ function bindEvents() {
     if ($('search-btn')) $('search-btn').onclick = () => handleS();
 
     document.querySelectorAll('#main-filter .tag').forEach(tag => {
-        tag.onclick = () => UISync.handleFilterClick(tag);
+        tag.onclick = () => {
+            const val = $('search-input').value.trim();
+            if (!val) {
+                // Feature: Empty search feed
+                document.querySelectorAll('#main-filter .tag').forEach(t => t.classList.remove('active'));
+                tag.classList.add('active');
+                activeType = tag.getAttribute('data-type');
+                loadLatestFeed(activeType);
+            } else {
+                UISync.handleFilterClick(tag);
+            }
+        };
     });
 }
 
@@ -304,14 +315,52 @@ async function loadDiscoverySingle(catId) {
         const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(cat.kw)}`);
         if (html) {
             const items = parsePanSearchHtml(html).slice(0, 8);
+            renderColumnList(el, items);
             let cached = CacheManager.get('discovery') || {};
             cached[catId] = items;
             CacheManager.save('discovery', cached);
-            renderColumnList(el, items);
             toast('已更新最新资源', 'success');
         }
     } catch (e) {
         if (el) el.innerHTML = '<span class="empty-state" style="font-size:0.8rem">加载失败</span>';
+    }
+}
+
+async function loadLatestFeed(type = 'all') {
+    const grid = $('results-grid');
+    if (!grid) return;
+
+    grid.innerHTML = '<div class="loading-state"><div class="loading-spinner"></div><p>正在为您获取最新热门资源...</p></div>';
+    $('hero-header').classList.add('collapsed');
+    const discovery = $('discovery-area');
+    if (discovery) discovery.style.display = 'none';
+
+    try {
+        // Fetch a larger batch for the feed
+        const res = await fetchWithProxy('https://s.panhunt.com/api/search?q=&page=1&limit=100');
+        let records = [];
+        if (res && res.data && res.data.merged_by_type) {
+            Object.values(res.data.merged_by_type).forEach(list => records = records.concat(list));
+        }
+
+        let feed = records.map(item => ({
+            ...item,
+            driveType: item.url.includes('quark') ? 'quark' :
+                (item.url.includes('baidu') ? 'baidu' :
+                    (item.url.includes('alipan') || item.url.includes('aliyundrive') ? 'aliyun' :
+                        (item.url.includes('drive.uc.cn') ? 'uc' : 'other')))
+        }));
+
+        if (type !== 'all') {
+            feed = feed.filter(it => it.driveType === type);
+        }
+
+        feed.sort((a, b) => new Date(b.datetime || 0) - new Date(a.datetime || 0));
+
+        allResults = feed;
+        renderCards(allResults);
+    } catch (e) {
+        grid.innerHTML = '<div class="empty-state"><p>暂时无法加载推荐流，请尝试直接搜索。</p></div>';
     }
 }
 
@@ -533,18 +582,24 @@ function renderCards(list) {
         return (p[a] || 99) - (p[b] || 99);
     });
     grid.innerHTML = sortedTypes.map(type => {
-        const items = groups[type], visible = items.slice(0, 2), hidden = items.slice(2);
+        const items = groups[type], visible = items.slice(0, 10), hidden = items.slice(10);
         const gid = `g-${type.replace(/[^ac-z0-9]/g, '')}`;
         return `
-            <div class="result-group">
+            <div class="result-group" id="group-${type}">
                 <div class="group-header"><span class="group-title">${escHtml(DRIVE_NAMES[type] || '其他')}</span><div class="group-line"></div></div>
-                <div class="group-visible">${visible.map((it, idx) => renderSingleCard(it, idx)).join('')}</div>
+                <div class="group-visible" id="${gid}-v">${visible.map((it, idx) => renderSingleCard(it, idx)).join('')}</div>
                 ${hidden.length ? `
-                    <div id="${gid}-h" class="hidden-results">${hidden.map((it, idx) => renderSingleCard(it, idx + 2)).join('')}</div>
+                    <div id="${gid}-h" class="hidden-results" data-full-list='${escAttr(JSON.stringify(hidden))}'></div>
                     <button class="show-more-btn" onclick="toggleGroup('${gid}')" id="${gid}-b">展开其余 (${hidden.length})</button>
                 ` : ''}
             </div>`;
     }).join('');
+
+    // Add Scroll Listener for infinite scroll on expanded groups
+    // The user said "打开折叠的时候，通过滚动自动加载"
+    // This logic is now handled within toggleGroup using IntersectionObserver.
+    // The previous window.onscroll block was commented out and not fully implemented,
+    // so it's removed to avoid confusion.
 }
 
 function renderSingleCard(item, idx) {
@@ -552,7 +607,6 @@ function renderSingleCard(item, idx) {
     const clickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
     const driveName = DRIVE_NAMES[type] || '其他网盘';
 
-    // UI Feedback: List format with Left-aligned title and small drive name below
     return `
         <div class="list-item" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${clickAction}">
             <div class="list-item-body">
@@ -570,6 +624,37 @@ function renderSingleCard(item, idx) {
                 </button>
             </div>
         </div>`;
+}
+
+function toggleGroup(gid) {
+    const h = $(`${gid}-h`), b = $(`${gid}-b`), v = $(`${gid}-v`);
+    if (h && b && v) {
+        const listStr = h.getAttribute('data-full-list');
+        if (!listStr) return;
+
+        const list = JSON.parse(listStr);
+        const toShow = list.slice(0, 20);
+        const remaining = list.slice(20);
+
+        v.innerHTML += toShow.map((it, idx) => renderSingleCard(it, idx + 20)).join('');
+
+        if (remaining.length) {
+            h.setAttribute('data-full-list', JSON.stringify(remaining));
+            b.textContent = `加载更多... (${remaining.length})`;
+
+            // Auto-load on scroll near bottom
+            const observer = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting) {
+                    observer.disconnect();
+                    toggleGroup(gid);
+                }
+            }, { rootMargin: '400px' });
+            observer.observe(b);
+        } else {
+            h.style.display = 'none';
+            b.style.display = 'none';
+        }
+    }
 }
 
 function showSearch() {
