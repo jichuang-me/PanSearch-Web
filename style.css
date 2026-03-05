@@ -132,13 +132,16 @@ h1 {
 
 .search-bar-wrap {
     position: relative;
-    max-width: 680px;
+    max-width: 760px;
+    /* Wider to accommodate toggle */
     margin: 0 auto 20px;
     z-index: 100;
 }
 
-.search-bar-wrap.compact {
-    max-width: 100%;
+.search-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .search-bar {
@@ -212,11 +215,15 @@ h1 {
 .precise-toggle {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 0 12px;
-    border-right: 1px solid var(--border);
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    backdrop-filter: blur(12px);
     user-select: none;
     cursor: pointer;
+    white-space: nowrap;
 }
 
 .precise-toggle label {

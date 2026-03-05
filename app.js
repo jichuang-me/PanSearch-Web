@@ -337,19 +337,32 @@ async function loadLatestFeed(type = 'all') {
     if (discovery) discovery.style.display = 'none';
 
     try {
-        // Fetch a larger batch for the feed
-        const res = await fetchWithProxy('https://s.panhunt.com/api/search?q=&page=1&limit=100');
+        // Fetch hot data from Multiple pages if possible, here we take a large batch
+        const res = await fetchWithProxy('https://s.panhunt.com/api/search?q=&page=1&limit=150');
         let records = [];
         if (res && res.data && res.data.merged_by_type) {
             Object.values(res.data.merged_by_type).forEach(list => records = records.concat(list));
+        } else if (res && Array.isArray(res.data)) {
+            records = res.data;
         }
+
+        const mapType = (url) => {
+            if (!url) return 'other';
+            if (url.includes('quark')) return 'quark';
+            if (url.includes('baidu')) return 'baidu';
+            if (url.includes('alipan') || url.includes('aliyundrive')) return 'aliyun';
+            if (url.includes('drive.uc.cn')) return 'uc';
+            if (url.includes('pan.xunlei.com')) return 'xunlei';
+            if (url.includes('yun.139.com')) return 'mobile';
+            if (url.includes('cloud.189.cn')) return 'telecom';
+            if (url.includes('mypikpak.com')) return 'pikpak';
+            if (url.includes('115.com')) return '115';
+            return 'other';
+        };
 
         let feed = records.map(item => ({
             ...item,
-            driveType: item.url.includes('quark') ? 'quark' :
-                (item.url.includes('baidu') ? 'baidu' :
-                    (item.url.includes('alipan') || item.url.includes('aliyundrive') ? 'aliyun' :
-                        (item.url.includes('drive.uc.cn') ? 'uc' : 'other')))
+            driveType: mapType(item.url)
         }));
 
         if (type !== 'all') {
@@ -360,6 +373,10 @@ async function loadLatestFeed(type = 'all') {
 
         allResults = feed;
         renderCards(allResults);
+
+        if (feed.length === 0) {
+            grid.innerHTML = `<div class="empty-state"><p>该网盘暂时没有最新资源更新。</p></div>`;
+        }
     } catch (e) {
         grid.innerHTML = '<div class="empty-state"><p>暂时无法加载推荐流，请尝试直接搜索。</p></div>';
     }
