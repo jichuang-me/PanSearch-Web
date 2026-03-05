@@ -61,34 +61,34 @@
                 </div>
 
                 <div class="hot-search-box inline-flex" id="main-hot">
-                    <span class="hot-title">🔥 热门搜索：</span>
+                    <span class="hot-title clickable-title" onclick="loadHotKeywords(true)" title="点击刷新热搜">🔥
+                        热门搜索：</span>
                     <div id="hot-tags" class="hot-tags"></div>
-                    <span id="refresh-hot" class="refresh-link" style="margin-left:8px;" title="刷新热搜">🔄</span>
                 </div>
             </div>
 
             <!-- Discovery (Inline Tag Clouds) -->
             <div id="discovery" class="discovery-grid" style="margin-top: 16px;">
                 <div class="disc-col-inline">
-                    <span class="disc-title">🎬 影视动态：</span>
+                    <span class="disc-title clickable-title" onclick="loadDiscoverySingle('movie')" title="点击刷新影视资源">🎬
+                        影视动态：</span>
                     <div id="list-movie" class="hot-tags">
                         <div class="loading-spinner mini"></div>
                     </div>
-                    <span class="refresh-link-inline" onclick="loadDiscoverySingle('movie')" title="刷新">🔄</span>
                 </div>
                 <div class="disc-col-inline">
-                    <span class="disc-title">📚 学习资料：</span>
+                    <span class="disc-title clickable-title" onclick="loadDiscoverySingle('doc')" title="点击刷新资料资源">📚
+                        学习资料：</span>
                     <div id="list-doc" class="hot-tags">
                         <div class="loading-spinner mini"></div>
                     </div>
-                    <span class="refresh-link-inline" onclick="loadDiscoverySingle('doc')" title="刷新">🔄</span>
                 </div>
                 <div class="disc-col-inline">
-                    <span class="disc-title">📦 其他资源：</span>
+                    <span class="disc-title clickable-title" onclick="loadDiscoverySingle('other')" title="点击刷新其他资源">📦
+                        其他资源：</span>
                     <div id="list-other" class="hot-tags">
                         <div class="loading-spinner mini"></div>
                     </div>
-                    <span class="refresh-link-inline" onclick="loadDiscoverySingle('other')" title="刷新">🔄</span>
                 </div>
             </div>
 

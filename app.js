@@ -158,7 +158,6 @@ function bindEvents() {
     }
 
     if ($('search-btn')) $('search-btn').onclick = () => handleS();
-    if ($('refresh-hot')) $('refresh-hot').onclick = () => loadHotKeywords(true);
 
     document.querySelectorAll('#main-filter .tag').forEach(tag => {
         tag.onclick = () => UISync.handleFilterClick(tag);
