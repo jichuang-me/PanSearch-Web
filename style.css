@@ -179,10 +179,7 @@ h1 {
 }
 
 .btn-sep {
-    width: 1px;
-    height: 14px;
-    background: var(--border);
-    margin: 0 4px;
+    display: none;
 }
 
 .search-bar input {
@@ -489,29 +486,17 @@ h1 {
 }
 
 .discovery-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    flex-direction: column;
     gap: 20px;
     animation: fade-up 0.5s var(--ease);
 }
 
-@media (max-width: 1024px) {
-    .discovery-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (max-width: 680px) {
-    .discovery-grid {
-        grid-template-columns: 1fr;
-    }
-}
-
 .disc-col {
-    background: var(--surface);
+    background: rgba(255, 255, 255, 0.02);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 20px;
+    padding: 16px;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     display: flex;
@@ -520,16 +505,16 @@ h1 {
 }
 
 .disc-col h3 {
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     font-weight: 700;
-    color: var(--text);
-    margin-bottom: 20px;
+    color: var(--muted);
+    margin-bottom: 12px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 8px;
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* Hot tags */

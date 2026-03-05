@@ -26,6 +26,7 @@ const DRIVE_NAMES = {
 let allResults = [];
 let activeType = 'all';
 let isSearching = false;
+let searchController = null; // For interrupting active searches
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -134,22 +135,22 @@ const HistoryManager = {
 })();
 
 function bindEvents() {
-    const handleS = (mode) => {
+    const handleS = () => {
         const val = $('search-input').value.trim();
-        if (val) doSearch(val, mode);
+        if (val) doSearch(val);
     };
 
     const input = $('search-input');
     if (input) {
         input.onkeydown = e => {
-            if (e.key === 'Enter') { e.preventDefault(); handleS('fuzzy'); }
+            if (e.key === 'Enter') { e.preventDefault(); handleS(); }
         };
         input.onfocus = () => HistoryManager.show();
         input.onblur = () => HistoryManager.hide();
+        // Stop current search if user starts typing a fresh new keyword (optional refinement)
     }
 
-    if ($('search-fuzzy-btn')) $('search-fuzzy-btn').onclick = () => handleS('fuzzy');
-    if ($('search-exact-btn')) $('search-exact-btn').onclick = () => handleS('exact');
+    if ($('search-btn')) $('search-btn').onclick = () => handleS();
     if ($('refresh-hot')) $('refresh-hot').onclick = () => loadHotKeywords(true);
 
     document.querySelectorAll('#main-filter .tag').forEach(tag => {
@@ -162,13 +163,26 @@ async function loadHotKeywords(force = false) {
     let kw = CacheManager.get('hot');
     if (!kw || force) {
         try {
-            const html = await fetchWithProxy('https://www.pansearch.me/');
-            const matches = html.match(/<a[^>]*class="[^"]*hot-item[^"]*"[^>]*>(.*?)<\/a>/g);
-            if (matches) {
-                kw = matches.map(m => m.replace(/<[^>]+>/g, '').trim()).slice(0, 10);
-                CacheManager.save('hot', kw);
+            // Use vvhan API for real-time Baidu Hot Search
+            const res = await fetch(`https://api.vvhan.com/api/hotlist/baiduRD`);
+            if (res.ok) {
+                const json = await res.json();
+                if (json.success && json.data) {
+                    kw = json.data.slice(0, 10).map(item => item.title);
+                    CacheManager.save('hot', kw);
+                }
             }
-        } catch (e) { }
+        } catch (e) {
+            // Fallback to PanSearch scraping
+            try {
+                const html = await fetchWithProxy('https://www.pansearch.me/');
+                const matches = html.match(/<a[^>]*class="[^"]*hot-item[^"]*"[^>]*>(.*?)<\/a>/g);
+                if (matches) {
+                    kw = matches.map(m => m.replace(/<[^>]+>/g, '').trim()).slice(0, 10);
+                    CacheManager.save('hot', kw);
+                }
+            } catch (err) { }
+        }
     }
     if (kw && kw.length) {
         UISync.renderHotTags(kw);
@@ -225,7 +239,15 @@ async function loadDiscoverySingle(catId) {
 
 // ─── SEARCH ENGINE ────────────────────────────────────────────────────────────
 async function doSearch(keyword, mode = 'fuzzy') {
-    if (!keyword || isSearching) return;
+    if (!keyword) return;
+
+    // Interrupt existing search
+    if (searchController) {
+        searchController.abort();
+    }
+    searchController = new AbortController();
+    const signal = searchController.signal;
+
     isSearching = true;
     keyword = keyword.trim();
     $('search-input').value = keyword;
@@ -235,7 +257,6 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
     setSearchLoading(true);
 
-    // Smooth scroll down to results
     setTimeout(() => {
         const grid = $('results-grid');
         if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -243,25 +264,30 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
     try {
         let results = [];
-        if (mode === 'fuzzy') {
-            const pages = [1, 2, 3, 4]; // Increased depth to 4 pages
-            for (let p of pages) {
-                const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}&page=${p}`);
-                if (html) results = results.concat(parsePanSearchHtml(html));
-            }
-            results = Array.from(new Set(results.map(a => a.url))).map(url => results.find(a => a.url === url));
-        } else {
-            const data = await tryFetchBackend(keyword) || await serverlessSearch(keyword);
-            results = data ? data.data : [];
+        // Sequential fetch with abort logic
+        const pages = [1, 2, 3, 4];
+        for (let p of pages) {
+            if (signal.aborted) return;
+            const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}&page=${p}`);
+            if (signal.aborted) return;
+            if (html) results = results.concat(parsePanSearchHtml(html));
         }
+        // Deduplicate
+        results = Array.from(new Set(results.map(a => a.url))).map(url => results.find(a => a.url === url));
+
+        if (signal.aborted) return;
         allResults = results || [];
         renderCards(allResults);
     } catch (e) {
+        if (e.name === 'AbortError') return;
         toast('搜索失败，检查网络后重试', 'error');
         renderCards([]);
     } finally {
-        isSearching = false;
-        setSearchLoading(false);
+        if (!signal.aborted) {
+            isSearching = false;
+            setSearchLoading(false);
+            searchController = null;
+        }
     }
 }
 
