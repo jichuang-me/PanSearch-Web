@@ -272,11 +272,14 @@ async function doSearch(keyword, mode = 'fuzzy') {
     }, 150);
 
     try {
-        // V15: High-speed parallel 10-page fetch via PanSou JSON API
-        const pages = Array.from({ length: 10 }, (_, i) => i + 1);
+        // V16: Multi-source parallel search (PanHunt + PanSearch + Backend)
+        const pages = Array.from({ length: 6 }, (_, i) => i + 1);
         const fetchPromises = pages.map(p =>
             fetchWithProxy(`https://s.panhunt.com/api/search?q=${encodeURIComponent(keyword)}&page=${p}&limit=20`)
         );
+
+        fetchPromises.push(tryFetchBackend(keyword));
+        fetchPromises.push(serverlessSearch(keyword));
 
         const responses = await Promise.all(fetchPromises);
         if (signal.aborted) return;
@@ -287,11 +290,17 @@ async function doSearch(keyword, mode = 'fuzzy') {
             try {
                 // Handle both raw strings (from AllOrigins) and parsed objects
                 const json = typeof resp === 'string' ? JSON.parse(resp) : resp;
-                if (json.code === 0 && json.data && json.data.merged_by_type) {
-                    const typedData = json.data.merged_by_type;
-                    Object.keys(typedData).forEach(t => {
-                        allRecords = allRecords.concat(typedData[t].map(item => ({ ...item, driveType: t })));
-                    });
+                if (json && json.code === 0 && json.data) {
+                    if (json.data.merged_by_type) {
+                        const typedData = json.data.merged_by_type;
+                        Object.keys(typedData).forEach(t => {
+                            allRecords = allRecords.concat(typedData[t].map(item => ({ ...item, driveType: t })));
+                        });
+                    } else if (Array.isArray(json.data)) {
+                        allRecords = allRecords.concat(json.data);
+                    }
+                } else if (Array.isArray(json)) {
+                    allRecords = allRecords.concat(json);
                 }
             } catch (e) {
                 // Fallback to HTML parsing if JSON fails
@@ -299,17 +308,21 @@ async function doSearch(keyword, mode = 'fuzzy') {
             }
         });
 
-        // V15: Precision Multi-Stage Filter & Scorer
+        // V16: Precision Multi-Stage Filter & Scorer
         const uniqueResults = [];
         const seenUrls = new Set();
         const kwLower = keyword.toLowerCase();
+        const kws = kwLower.split(/\s+/).filter(Boolean);
 
         allRecords.forEach(item => {
             if (!item.url || seenUrls.has(item.url)) return;
 
-            const note = (item.note || '').toLowerCase();
-            // Stage 1: strict relevance check
-            if (!note.includes(kwLower) && !kwLower.includes(note)) return;
+            const note = (item.title || item.note || '').toLowerCase();
+
+            // Stage 1: smart relevance check (multi-keyword)
+            const isGeneric = note === "未知资源" || note === "";
+            const matchesAll = isGeneric || kws.every(k => note.includes(k) || kwLower.includes(note));
+            if (!matchesAll) return;
 
             // Stage 2: Quality/Recency Scoring
             let score = 0;
@@ -319,9 +332,12 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
             // Recency weighting
             if (item.datetime) {
-                const daysOld = (new Date() - new Date(item.datetime)) / (1000 * 3600 * 24);
-                if (daysOld < 7) score += 20; // Very fresh (latest)
-                else if (daysOld < 30) score += 10;
+                const dt = new Date(item.datetime);
+                if (!isNaN(dt.getTime())) {
+                    const daysOld = (new Date() - dt) / (1000 * 3600 * 24);
+                    if (daysOld < 7) score += 20; // Very fresh (latest)
+                    else if (daysOld < 30) score += 10;
+                }
             }
 
             item.score = score;
@@ -341,7 +357,7 @@ async function doSearch(keyword, mode = 'fuzzy') {
     } catch (e) {
         if (e.name === 'AbortError') return;
         console.error('Search engine error:', e);
-        toast('搜索受阻，请稍后刷新重试', 'error');
+        toast(`搜索出现错误: ${e.message}`, 'error');
         renderCards([]);
     } finally {
         if (!signal.aborted) {
@@ -354,7 +370,7 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
 async function tryFetchBackend(kw) {
     try {
-        const res = await fetch(`${BACKEND_URL}?q=${encodeURIComponent(kw)}`, { signal: AbortSignal.timeout(1500) });
+        const res = await fetch(`${BACKEND_URL}?q=${encodeURIComponent(kw)}`, { signal: AbortSignal.timeout(5000) });
         return res.ok ? await res.json() : null;
     } catch (e) { return null; }
 }
@@ -402,7 +418,8 @@ function renderCards(list) {
     const filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
     const grid = $('results-grid');
     if (!grid) return;
-    $('result-info').textContent = filtered.length ? `为你搜索到 ${filtered.length} 条资源` : '未发现有效链接';
+    const infoEl = $('result-info');
+    if (infoEl) infoEl.textContent = filtered.length ? `为你搜索到 ${filtered.length} 条资源` : '未发现有效链接';
     if (!filtered.length) {
         grid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>换个关键词试试？</p></div>`;
         return;
@@ -477,7 +494,7 @@ async function fetchWithProxy(url) {
         } catch (e) { return null; }
     };
 
-    // V15: High Performance Proxy Chain
+    // V16: High Performance Proxy Chain
     // Try CorsProxy first (often cleaner for raw JSON data)
     try {
         const res = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(url)}`, 4000);
@@ -487,7 +504,16 @@ async function fetchWithProxy(url) {
         }
     } catch (e) { }
 
-    // Fallback to AllOrigins (Very robust for GET)
+    // Backup 2: CodeTabs proxy
+    try {
+        const res = await fetchWithTimeout(`https://api.codetabs.com/v1/proxy/?quest=${encodeURIComponent(url)}`, 4000);
+        if (res && res.ok) {
+            const text = await res.text();
+            try { return JSON.parse(text); } catch (e) { return text; }
+        }
+    } catch (e) { }
+
+    // Backup 3: AllOrigins (Very robust for GET)
     try {
         const res = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`, 5000);
         if (res && res.ok) {
