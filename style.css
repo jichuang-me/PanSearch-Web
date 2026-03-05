@@ -1176,10 +1176,10 @@ h1 {
 }
 
 .nested-items {
-    padding: 4px 12px 12px 40px;
+    padding: 4px 12px 12px 16px;
     background: rgba(255, 255, 255, 0.02);
     border-left: 2px solid var(--border);
-    margin-left: 20px;
+    margin-left: 14px;
     display: flex;
     flex-direction: column;
     gap: 8px;
