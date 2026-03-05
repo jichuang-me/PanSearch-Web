@@ -20,6 +20,20 @@ const DISCOVERY_CATS = [
     { id: 'doc', label: '📚 学习', kw: '资料' }
 ];
 
+// Drive Name Map for Grouping
+const DRIVE_NAMES = {
+    'quark': '夸克云盘',
+    'baidu': '百度网盘',
+    'aliyun': '阿里云盘',
+    'uc': 'UC网盘',
+    'xunlei': '迅雷云盘',
+    'mobile': '中国移动云盘',
+    'telecom': '天翼云盘',
+    'pikpak': 'PikPak',
+    '115': '115网盘',
+    'other': '其他资源'
+};
+
 // ─── State ────────────────────────────────────────────────────────────────────
 let allResults = [];
 let activeType = 'all';
@@ -91,8 +105,6 @@ async function loadDiscovery() {
     if (hotTagsEl) {
         hotTagsEl.innerHTML = HOT_KEYWORDS.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${k}</span>`).join('');
     }
-
-    // Process each category in parallel
     DISCOVERY_CATS.forEach(cat => fetchAndRenderCol(cat));
 }
 
@@ -189,7 +201,7 @@ async function serverlessSearch(keyword) {
         const filtered = rawItems.filter(it =>
             it.note.toLowerCase().includes(keyword.toLowerCase()) ||
             keyword.toLowerCase().includes(it.note.toLowerCase())
-        ).slice(0, 30);
+        ).slice(0, 50); // Fetch more for grouping
 
         return { code: 0, data: filtered };
     } catch (e) { return null; }
@@ -251,11 +263,55 @@ function renderCards(list) {
         return;
     }
 
-    resultsGrid.innerHTML = filtered.map((item, idx) => {
+    // Grouping Logic
+    const groups = {};
+    filtered.forEach(item => {
         const type = item.driveType || 'other';
-        const badgeClass = `badge-${['quark', 'baidu', 'aliyun', 'uc', 'xunlei', 'mobile', 'telecom', 'pikpak'].includes(type) ? type : 'other'}`;
-        const onClickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
-        return `<div class="card card-clickable" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${onClickAction}">
+        if (!groups[type]) groups[type] = [];
+        groups[type].push(item);
+    });
+
+    // Sort groups so major drives appear first
+    const sortedTypes = Object.keys(groups).sort((a, b) => {
+        const priority = { 'aliyun': 1, 'quark': 2, 'baidu': 3, 'uc': 4, 'xunlei': 5, 'mobile': 6, 'telecom': 7, 'pikpak': 8, '115': 9, 'other': 10 };
+        return (priority[a] || 99) - (priority[b] || 99);
+    });
+
+    resultsGrid.innerHTML = sortedTypes.map(type => {
+        const items = groups[type];
+        const driveName = DRIVE_NAMES[type] || '其他网盘';
+        const visibleItems = items.slice(0, 2);
+        const hiddenItems = items.slice(2);
+        const groupId = `group-${type}`;
+
+        return `
+            <div class="result-group">
+                <div class="group-header">
+                    <span class="group-title">${driveName}</span>
+                    <div class="group-line"></div>
+                </div>
+                <div class="group-visible">
+                    ${visibleItems.map((it, idx) => renderSingleCard(it, idx)).join('')}
+                </div>
+                ${hiddenItems.length > 0 ? `
+                    <div id="${groupId}-hidden" class="hidden-results">
+                        ${hiddenItems.map((it, idx) => renderSingleCard(it, idx + 2)).join('')}
+                    </div>
+                    <button class="show-more-btn" onclick="toggleGroup('${groupId}')" id="${groupId}-btn">
+                        查看更多 (${hiddenItems.length})
+                    </button>
+                ` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function renderSingleCard(item, idx) {
+    const type = item.driveType || 'other';
+    const badgeClass = `badge-${['quark', 'baidu', 'aliyun', 'uc', 'xunlei', 'mobile', 'telecom', 'pikpak'].includes(type) ? type : 'other'}`;
+    const onClickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
+    return `
+        <div class="card card-clickable" style="margin-bottom:10px; animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${onClickAction}">
             <span class="drive-badge ${badgeClass}">${type}</span>
             <div class="card-body">
                 <div class="card-name" title="${escAttr(item.note)}">${escHtml(item.note)}</div>
@@ -265,7 +321,15 @@ function renderCards(list) {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
         </div>`;
-    }).join('');
+}
+
+function toggleGroup(groupId) {
+    const hidden = $(`${groupId}-hidden`);
+    const btn = $(`${groupId}-btn`);
+    if (hidden && btn) {
+        const isActive = hidden.classList.toggle('active');
+        btn.textContent = isActive ? '收起结果' : `查看更多 (${hidden.children.length})`;
+    }
 }
 
 function showSearch() {
@@ -319,4 +383,4 @@ function toast(msg, type = 'info') {
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
-window.doSearch = doSearch; window.showSearch = showSearch; window.copyUrl = copyUrl;
+window.doSearch = doSearch; window.showSearch = showSearch; window.copyUrl = copyUrl; window.toggleGroup = toggleGroup;
