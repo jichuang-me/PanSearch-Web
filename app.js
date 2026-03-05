@@ -15,9 +15,7 @@ const HOT_KEYWORDS = [
 
 const DISCOVERY_CATS = [
     { id: 'movie', label: '🎬 影视', kw: '影视' },
-    { id: 'music', label: '🎵 音乐', kw: '音乐' },
-    { id: 'software', label: '💻 软件', kw: '软件' },
-    { id: 'doc', label: '📚 学习', kw: '资料' },
+    { id: 'doc', label: '📚 资料', kw: '资料' },
     { id: 'other', label: '📦 其他', kw: '资源' }
 ];
 
@@ -35,10 +33,59 @@ const DRIVE_NAMES = {
     'other': '其他资源'
 };
 
-// ─── State ────────────────────────────────────────────────────────────────────
+// ─── State & History ──────────────────────────────────────────────────────────
 let allResults = [];
 let activeType = 'all';
 let isSearching = false;
+
+const HistoryManager = {
+    key: 'pansearch_history',
+    limit: 10,
+    isExpanded: false,
+
+    get() {
+        try {
+            return JSON.parse(localStorage.getItem(this.key) || '[]');
+        } catch (e) { return []; }
+    },
+
+    add(kw) {
+        if (!kw) return;
+        let list = this.get().filter(i => i !== kw);
+        list.unshift(kw);
+        localStorage.setItem(this.key, JSON.stringify(list.slice(0, this.limit)));
+        this.render();
+    },
+
+    toggle() {
+        this.isExpanded = !this.isExpanded;
+        this.render();
+    },
+
+    render() {
+        const box = $('history-box');
+        const tags = $('history-tags');
+        const btn = $('toggle-history');
+        if (!box || !tags) return;
+
+        const list = this.get();
+        if (!list.length) {
+            box.style.display = 'none';
+            return;
+        }
+
+        box.style.display = 'flex';
+        const displayList = this.isExpanded ? list : list.slice(0, 3);
+        tags.innerHTML = displayList.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${escHtml(k)}</span>`).join('');
+
+        if (list.length > 3) {
+            btn.style.display = 'inline-block';
+            btn.textContent = this.isExpanded ? '收起' : `更多 (${list.length - 3})`;
+        } else {
+            btn.style.display = 'none';
+        }
+    }
+};
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -77,6 +124,7 @@ async function fetchWithProxy(url) {
     if (!viewSearch) return;
     bindEvents();
     loadDiscovery();
+    HistoryManager.render();
 })();
 
 function bindEvents() {
@@ -91,6 +139,9 @@ function bindEvents() {
     if (resultsInput) resultsInput.onkeydown = e => e.key === 'Enter' && handleSearch();
     if (backBtn) backBtn.onclick = showSearch;
 
+    const toggleHist = $('toggle-history');
+    if (toggleHist) toggleHist.onclick = () => HistoryManager.toggle();
+
     document.querySelectorAll('.type-filter .tag').forEach(tag => {
         tag.onclick = () => {
             const type = tag.dataset.type;
@@ -104,7 +155,7 @@ function bindEvents() {
 // ─── DISCOVERY (GRID LAYOUT) ────────────────────────────────────────────────
 async function loadDiscovery() {
     if (hotTagsEl) {
-        hotTagsEl.innerHTML = HOT_KEYWORDS.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${k}</span>`).join('');
+        hotTagsEl.innerHTML = HOT_KEYWORDS.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${escHtml(k)}</span>`).join('');
     }
     DISCOVERY_CATS.forEach(cat => fetchAndRenderCol(cat));
 }
@@ -152,8 +203,9 @@ async function doSearch(keyword) {
     if (searchInput) searchInput.value = keyword;
     if (resultsInput) resultsInput.value = keyword;
 
+    HistoryManager.add(keyword);
     showResults();
-    if (resultInfo) resultInfo.textContent = `正在强力聚合 "${keyword}" 的极速资源…`;
+    if (resultInfo) resultInfo.textContent = `正在聚合 "${keyword}" 的极速资源…`;
     setSearchLoading(true);
 
     try {
@@ -188,7 +240,8 @@ async function tryFetchBackend(kw) {
 
 async function serverlessSearch(keyword) {
     try {
-        const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}`);
+        const url = `https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}`;
+        const html = await fetchWithProxy(url);
         if (!html) return null;
         const rawItems = parsePanSearchHtml(html);
         return { code: 0, data: rawItems };
@@ -234,13 +287,11 @@ function renderCards(list) {
     const filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
 
     if (resultInfo) resultInfo.textContent = filtered.length ? `为你搜索到 ${filtered.length} 条资源` : '未发现有效链接';
-
     if (!filtered.length) {
         resultsGrid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>换个关键词试试？</p></div>`;
         return;
     }
 
-    // 1. Mandatory Grouping
     const groups = {};
     filtered.forEach(item => {
         const type = item.driveType || 'other';
@@ -248,24 +299,22 @@ function renderCards(list) {
         groups[type].push(item);
     });
 
-    // 2. Clear Priority Sort
     const sortedTypes = Object.keys(groups).sort((a, b) => {
         const priority = { 'aliyun': 1, 'quark': 2, 'baidu': 3, 'uc': 4, 'xunlei': 5, 'mobile': 6, 'telecom': 7, 'pikpak': 8, '115': 9, 'other': 10 };
         return (priority[a] || 99) - (priority[b] || 99);
     });
 
-    // 3. Render Grouped UI
     resultsGrid.innerHTML = sortedTypes.map(type => {
         const items = groups[type];
         const driveName = DRIVE_NAMES[type] || '其他网盘';
         const visibleItems = items.slice(0, 2);
         const hiddenItems = items.slice(2);
-        const groupId = `group-${type.replace(/[^a-z]/g, '')}`;
+        const groupId = `group-${type.replace(/[^a-z0-9]/g, '')}`;
 
         return `
             <div class="result-group">
                 <div class="group-header">
-                    <span class="group-title">${driveName}</span>
+                    <span class="group-title">${escHtml(driveName)}</span>
                     <div class="group-line"></div>
                 </div>
                 <div class="group-visible">
@@ -276,7 +325,7 @@ function renderCards(list) {
                         ${hiddenItems.map((it, idx) => renderSingleCard(it, idx + 2)).join('')}
                     </div>
                     <button class="show-more-btn" onclick="toggleGroup('${groupId}')" id="${groupId}-btn">
-                        查看更多 (${hiddenItems.length})
+                        展开其余 (${hiddenItems.length})
                     </button>
                 ` : ''}
             </div>
@@ -290,7 +339,7 @@ function renderSingleCard(item, idx) {
     const onClickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
     return `
         <div class="card card-clickable" style="margin-bottom:10px; animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${onClickAction}">
-            <span class="drive-badge ${badgeClass}">${type}</span>
+            <span class="drive-badge ${badgeClass}">${escHtml(type)}</span>
             <div class="card-body">
                 <div class="card-name" title="${escAttr(item.note)}">${escHtml(item.note)}</div>
                 <div class="card-meta"><span>📅 ${item.datetime ? item.datetime.split('T')[0] : '未知'}</span></div>
@@ -306,7 +355,7 @@ function toggleGroup(groupId) {
     const btn = $(`${groupId}-btn`);
     if (hidden && btn) {
         const isActive = hidden.classList.toggle('active');
-        btn.textContent = isActive ? '收起结果' : `查看更多 (${hidden.children.length})`;
+        btn.textContent = isActive ? '收起结果' : `展开其余 (${hidden.children.length})`;
     }
 }
 
@@ -314,6 +363,7 @@ function showSearch() {
     viewSearch.classList.add('active');
     viewResults.classList.remove('active');
     allResults = [];
+    HistoryManager.render();
 }
 
 function showResults() {
