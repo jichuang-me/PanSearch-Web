@@ -750,7 +750,6 @@ function renderSingleCard(item, idx) {
             <div class="list-item" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${clickAction}">
                 <div class="list-item-body">
                     <div class="list-item-title" title="${escAttr(item.note)}">
-                        <span class="type-tag-mini">${escHtml(catName)}</span>
                         ${escHtml(item.note)}
                         ${hasMembers ? `<span class="agg-badge" onclick="event.stopPropagation(); toggleNested('${nid}')">📦 ${item.members.length}个结果</span>` : ''}
                     </div>
@@ -761,6 +760,7 @@ function renderSingleCard(item, idx) {
                     </div>
                 </div>
                 <div class="list-item-actions">
+                    <span class="type-tag-mini">${escHtml(catName)}</span>
                     <span class="validity-indicator" title="资源可能有效"><span class="valid-dot"></span></span>
                     <button class="btn-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -780,7 +780,6 @@ function renderSingleCard(item, idx) {
         return `
                         <div class="nested-item" onclick="${mClick}">
                             <div class="nested-item-left">
-                                <span class="type-tag-mini">${escHtml(classifyResource(m))}</span>
                                 <span class="nested-url-title text-truncate">${escHtml(m.title || m.note || m.url)}</span>
                                 ${m.pwd ? `<span class="nested-tag-mini pwd">🔑 ${escHtml(m.pwd)}</span>` : ''}
                                 ${m.size ? `<span class="nested-tag-mini size">💾 ${escHtml(m.size)}</span>` : ''}
@@ -789,6 +788,7 @@ function renderSingleCard(item, idx) {
                                 ${m.from ? `<span class="nested-tag-mini source">${escHtml(m.from)}</span>` : ''}
                                 <span class="nested-sharer">${escHtml(m.sharer || '匿名')}</span>
                                 <span class="nested-date">${m.datetime ? m.datetime.split('T')[0] : ''}</span>
+                                <span class="type-tag-mini">${escHtml(classifyResource(m))}</span>
                                 <span class="valid-dot mini"></span>
                                 <div class="nested-actions">
                                     ${mType === 'quark' ? `
