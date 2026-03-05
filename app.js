@@ -641,7 +641,7 @@ function renderCards(list) {
     const grid = $('results-grid');
     if (!grid) return;
 
-    // --- Step 1: Aggregation Logic ---
+    // --- Step 1: Nested Aggregation Logic ---
     const aggregated = [];
     const aggMap = new Map(); // key: normalizeTitle + driveType
 
@@ -649,12 +649,14 @@ function renderCards(list) {
         const norm = normalizeTitle(item.note);
         const key = `${norm}|${item.driveType}`;
         if (!aggMap.has(key)) {
-            aggMap.set(key, { ...item, _aggCount: 1 });
-            aggregated.push(aggMap.get(key));
+            const group = { ...item, members: [item] };
+            aggMap.set(key, group);
+            aggregated.push(group);
         } else {
-            const existing = aggMap.get(key);
-            existing._aggCount++;
-            if (item.note.length > existing.note.length) existing.note = item.note;
+            const group = aggMap.get(key);
+            group.members.push(item);
+            // Ensure primary title is the best version
+            if (item.note.length > group.note.length) group.note = item.note;
         }
     });
 
@@ -723,26 +725,55 @@ function renderCards(list) {
 
 function renderSingleCard(item, idx) {
     const type = item.driveType || 'other';
-    const clickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
     const driveName = DRIVE_NAMES[type] || '其他网盘';
+    const hasMembers = item.members && item.members.length > 1;
+    const clickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
+
+    // Unique ID for nested toggle
+    const nid = `nid-${Math.random().toString(36).substr(2, 9)}`;
 
     return `
-        <div class="list-item" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${clickAction}">
-            <div class="list-item-body">
-                <div class="list-item-title" title="${escAttr(item.note)}">${escHtml(item.note)}</div>
-                <div class="list-item-meta">
-                    <span class="drive-badge-text badge-text-${type}">${escHtml(driveName)}</span>
-                    <span class="meta-divider">|</span>
-                    <span>📅 ${item.datetime ? item.datetime.split('T')[0] : '未知'}</span>
+        <div class="list-item-wrapper">
+            <div class="list-item" style="animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${clickAction}">
+                <div class="list-item-body">
+                    <div class="list-item-title" title="${escAttr(item.note)}">
+                        ${escHtml(item.note)}
+                        ${hasMembers ? `<span class="agg-badge" onclick="event.stopPropagation(); toggleNested('${nid}')">📦 ${item.members.length}个结果</span>` : ''}
+                    </div>
+                    <div class="list-item-meta">
+                        <span class="drive-badge-text badge-text-${type}">${escHtml(driveName)}</span>
+                        <span class="meta-divider">|</span>
+                        <span>📅 ${item.datetime ? item.datetime.split('T')[0] : '未知'}</span>
+                    </div>
+                </div>
+                <div class="list-item-actions">
+                    <span class="validity-indicator" title="资源可能有效"><span class="valid-dot"></span></span>
+                    <button class="btn-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    </button>
+                    ${hasMembers ? `
+                        <button class="btn-icon toggle-icon" title="展开所有版本" onclick="event.stopPropagation(); toggleNested('${nid}')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 13l5 5 5-5M7 6l5 5 5-5"/></svg>
+                        </button>
+                    ` : ''}
                 </div>
             </div>
-            <div class="list-item-actions">
-                <span class="validity-indicator" title="资源可能有效"><span class="valid-dot"></span></span>
-                <button class="btn-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                </button>
-            </div>
+            ${hasMembers ? `
+                <div id="${nid}" class="nested-items" style="display:none">
+                    ${item.members.map(m => `
+                        <div class="nested-item" onclick="window.open('${escAttr(m.url)}', '_blank')">
+                            <span class="nested-url-title text-truncate">${escHtml(m.title || m.note || m.url)}</span>
+                            <span class="nested-date">${m.datetime ? m.datetime.split('T')[0] : ''}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
         </div>`;
+}
+
+function toggleNested(nid) {
+    const el = $(nid);
+    if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 
 function toggleGroup(gid) {
@@ -863,4 +894,4 @@ function toast(m, t = 'info') {
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
-window.doSearch = doSearch; window.HistoryManager = HistoryManager; window.toggleGroup = toggleGroup; window.copyUrl = copyUrl; window.CacheManager = CacheManager; window.loadDiscoverySingle = loadDiscoverySingle;
+window.doSearch = doSearch; window.HistoryManager = HistoryManager; window.toggleGroup = toggleGroup; window.copyUrl = copyUrl; window.CacheManager = CacheManager; window.loadDiscoverySingle = loadDiscoverySingle; window.toggleNested = toggleNested;
