@@ -27,12 +27,34 @@
                 <h1>搜索<span class="g">全网网盘</span>资源</h1>
                 <p class="sub">聚合夸克 · 百度 · 阿里 · UC · 115 · PikPak</p>
 
-                <div class="search-bar" id="search-bar">
-                    <input id="search-input" type="text" placeholder="输入关键词，如：三体、奥本海默…" autocomplete="off" autofocus>
-                    <button id="search-btn">搜索</button>
+                <div class="search-bar-wrap">
+                    <div class="search-bar" id="search-bar">
+                        <input id="search-input" type="text" placeholder="输入关键词，如：三体、奥本海默…" autocomplete="off"
+                            autofocus>
+                        <button id="search-btn">搜索</button>
+                    </div>
+                    <!-- Search History Dropdown -->
+                    <div id="history-dropdown" class="history-dropdown" style="display: none;">
+                        <div class="dropdown-header">
+                            <span>🕒 搜索历史</span>
+                            <button id="clear-all-history" class="btn-text danger">清空全部</button>
+                        </div>
+                        <div id="history-list" class="history-list"></div>
+                    </div>
                 </div>
 
-                <div class="type-filter">
+                <div class="search-modes">
+                    <label class="mode-item">
+                        <input type="radio" name="search-mode" value="exact" checked>
+                        <span class="mode-text">精确搜索</span>
+                    </label>
+                    <label class="mode-item">
+                        <input type="radio" name="search-mode" value="fuzzy">
+                        <span class="mode-text">模糊搜索</span>
+                    </label>
+                </div>
+
+                <div class="type-filter" id="main-filter">
                     <button class="tag active" data-type="all">全部</button>
                     <button class="tag" data-type="quark">夸克</button>
                     <button class="tag" data-type="baidu">百度</button>
@@ -42,18 +64,10 @@
                     <button class="tag" data-type="mobile">移动</button>
                     <button class="tag" data-type="telecom">天翼</button>
                     <button class="tag" data-type="pikpak">PikPak</button>
+                    <button class="tag" data-type="115">115</button>
                 </div>
 
-                <!-- Search History Section -->
-                <div id="history-box" class="history-box" style="display: none;">
-                    <div class="history-header">
-                        <span class="hot-title">🕒 搜索历史：</span>
-                        <div id="history-tags" class="hot-tags"></div>
-                        <button id="toggle-history" class="btn-text">展开</button>
-                    </div>
-                </div>
-
-                <div class="hot-search-box">
+                <div class="hot-search-box" id="main-hot">
                     <span class="hot-title">🔥 热门搜索：</span>
                     <div id="hot-tags" class="hot-tags"></div>
                 </div>
@@ -86,23 +100,19 @@
         <section id="view-results" class="view">
             <div class="results-header">
                 <button id="back-btn" class="back-btn">← 重新搜索</button>
+                <div class="search-bar-wrap compact">
+                    <div class="search-bar compact" id="results-search-bar">
+                        <input id="results-input" type="text" placeholder="再搜一次…" autocomplete="off">
+                        <button id="results-search-btn">搜索</button>
+                    </div>
+                </div>
                 <span id="result-info" class="result-info"></span>
             </div>
 
-            <!-- Compact search bar at top of results -->
-            <div class="search-bar compact" id="results-search-bar">
-                <input id="results-input" type="text" placeholder="再搜一次…" autocomplete="off">
-                <button id="results-search-btn">搜索</button>
-            </div>
-
-            <div class="type-filter">
-                <button class="tag active" data-type="all">全部</button>
-                <button class="tag" data-type="quark">夸克</button>
-                <button class="tag" data-type="baidu">百度</button>
-                <button class="tag" data-type="aliyun">阿里</button>
-                <button class="tag" data-type="uc">UC</button>
-                <button class="tag" data-type="115">115</button>
-                <button class="tag" data-type="pikpak">PikPak</button>
+            <!-- UI components synced from home -->
+            <div class="results-ui-sync">
+                <div class="type-filter" id="results-filter"></div>
+                <div class="hot-search-box" id="results-hot"></div>
             </div>
 
             <div id="results-grid" class="results-grid"></div>
