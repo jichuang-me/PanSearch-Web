@@ -762,8 +762,14 @@ function renderSingleCard(item, idx) {
                 <div id="${nid}" class="nested-items" style="display:none">
                     ${item.members.map(m => `
                         <div class="nested-item" onclick="window.open('${escAttr(m.url)}', '_blank')">
-                            <span class="nested-url-title text-truncate">${escHtml(m.title || m.note || m.url)}</span>
-                            <span class="nested-date">${m.datetime ? m.datetime.split('T')[0] : ''}</span>
+                            <div class="nested-item-left">
+                                <span class="valid-dot mini"></span>
+                                <span class="nested-url-title text-truncate">${escHtml(m.title || m.note || m.url)}</span>
+                            </div>
+                            <div class="nested-item-right">
+                                <span class="nested-sharer">${escHtml(m.sharer || '匿名')}</span>
+                                <span class="nested-date">${m.datetime ? m.datetime.split('T')[0] : ''}</span>
+                            </div>
                         </div>
                     `).join('')}
                 </div>

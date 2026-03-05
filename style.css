@@ -1028,6 +1028,13 @@ h1 {
     box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
 }
 
+.valid-dot.mini {
+    width: 6px;
+    height: 6px;
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+    flex-shrink: 0;
+}
+
 .btn-icon {
     background: transparent;
     border: none;
@@ -1189,6 +1196,32 @@ h1 {
     cursor: pointer;
     transition: all 0.2s;
     font-size: 0.85rem;
+    gap: 12px;
+}
+
+.nested-item-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+}
+
+.nested-item-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
+
+.nested-sharer {
+    color: var(--primary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.8;
+    background: rgba(129, 140, 248, 0.1);
+    padding: 1px 6px;
+    border-radius: 4px;
 }
 
 .nested-item:hover {
