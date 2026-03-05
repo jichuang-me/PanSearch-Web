@@ -83,21 +83,64 @@ function bindEvents() {
     });
 }
 
-// ─── DISCOVERY ───────────────────────────────────────────────────────────────
+// ─── DISCOVERY (HOT + LATEST) ───────────────────────────────────────────────
 async function loadDiscovery() {
     if (hotTagsEl) {
         hotTagsEl.innerHTML = HOT_KEYWORDS.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${k}</span>`).join('');
     }
 
     try {
-        const data = await tryFetchBackend('latest');
+        // 1. Try backend
+        let data = await tryFetchBackend('latest');
+
+        // 2. Try serverless if backend fails
+        if (!data || data.code !== 0) {
+            console.log("[Discovery] Backend failed, switching to Serverless mode...");
+            data = await serverlessDiscovery();
+        }
+
         if (data && data.code === 0) {
             renderLatest(data.data);
         } else {
             if (latestListEl) latestListEl.innerHTML = '<div class="latest-item" style="color:var(--muted);font-size:.8rem">欢迎使用！输入关键词开始搜索</div>';
         }
     } catch (e) {
-        if (latestListEl) latestListEl.innerHTML = '<div class="latest-item" style="color:var(--muted);font-size:.8rem">欢迎使用！输入关键词开始搜索</div>';
+        if (latestListEl) latestListEl.innerHTML = '<div class="latest-item" style="color:var(--muted);font-size:.8rem">初始化完成，准备就绪</div>';
+    }
+}
+
+async function serverlessDiscovery() {
+    try {
+        const html = await fetchWithProxy('https://www.pansearch.me/');
+        if (!html) return null;
+
+        const items = [];
+        const regex = /<div class="card-body">([\s\S]*?)<\/div>/g;
+        let match;
+        while ((match = regex.exec(html)) !== null) {
+            const content = match[1];
+            const noteMatch = content.match(/<h5[^>]*>(.*?)<\/h5>/i) || content.match(/1、(.*?):/i);
+            const urlMatch = content.match(/href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn)\/s\/[a-zA-Z0-9_\-]+)"/i);
+
+            if (urlMatch) {
+                const url = urlMatch[1];
+                let driveType = 'other';
+                if (url.includes('quark')) driveType = 'quark';
+                else if (url.includes('baidu')) driveType = 'baidu';
+                else if (url.includes('alipan') || url.includes('aliyundrive')) driveType = 'aliyun';
+                else if (url.includes('uc.cn')) driveType = 'uc';
+
+                items.push({
+                    note: noteMatch ? noteMatch[1].replace(/<[^>]+>/g, '').trim() : "未知资源",
+                    url: url,
+                    driveType: driveType,
+                    datetime: new Date().toISOString()
+                });
+            }
+        }
+        return { code: 0, data: items.slice(0, 10) };
+    } catch (e) {
+        return null;
     }
 }
 
@@ -131,7 +174,7 @@ async function doSearch(keyword) {
 
         // 2. If backend fails (e.g. GitHub Pages), fallback to Serverless Client-side mode
         if (!data || data.code !== 0) {
-            console.log("[Search] Backend failed, switching to Serverless Client-side mode...");
+            console.log("[Search] Backend failed, switching to Serverless mode...");
             data = await serverlessSearch(keyword);
         }
 
@@ -147,7 +190,7 @@ async function doSearch(keyword) {
             throw new Error("Search failed");
         }
     } catch (e) {
-        toast('搜索失败，请检查网络', 'error');
+        toast('请刷新页面重试', 'error');
         if (resultInfo) resultInfo.textContent = `搜索服务暂时不可用`;
     } finally {
         isSearching = false;
@@ -158,7 +201,7 @@ async function doSearch(keyword) {
 async function tryFetchBackend(kw) {
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 1500);
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
         const res = await fetch(`${BACKEND_URL}?q=${encodeURIComponent(kw)}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (!res.ok) return null;
@@ -166,7 +209,6 @@ async function tryFetchBackend(kw) {
     } catch (e) { return null; }
 }
 
-// ─── SERVERLESS (CLIENT-SIDE SCRAPER) ────────────────────────────────────────
 async function serverlessSearch(keyword) {
     try {
         const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}`);
@@ -200,7 +242,7 @@ async function serverlessSearch(keyword) {
         const filtered = items.filter(it => it.note.toLowerCase().includes(keyword.toLowerCase())).slice(0, 15);
         return { code: 0, data: filtered };
     } catch (e) {
-        console.error("[Serverless] Error", e);
+        console.error("[Search] Serverless error", e);
         return null;
     }
 }
