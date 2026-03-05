@@ -1,14 +1,20 @@
-const express = require('express');
-const cors = require('cors');
-const axios = require('axios');
-const https = require('https');
 const path = require('path');
-
-// 【重要】后端搜索代理环境下的 SSL 兼容性处理
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const app = express();
 app.use(cors());
+
+// 极速内存缓存：保存 10 分钟内的搜索结果，显著提升重复查询效率
+const searchCache = new Map();
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
+
+function getCached(key) {
+    const entry = searchCache.get(key);
+    if (entry && Date.now() - entry.time < CACHE_TTL) return entry.data;
+    return null;
+}
+function setCache(key, data) {
+    searchCache.set(key, { time: Date.now(), data });
+}
 
 // 静态文件托管：将当前目录下的 index.html, app.js, style.css 等直接提供给浏览器
 app.use(express.static(__dirname));
@@ -165,8 +171,19 @@ app.get('/api/search', async (req, res) => {
         return res.json({ code: 0, data: filtered.slice(0, 10) });
     }
 
-    // 1. 获取基础搜索结果
-    const rawData = await searchPansou(keyword, limit);
+    // 1. 获取基础搜索结果 (优先从缓存读取)
+    const cached = getCached(keyword);
+    let rawData;
+    if (cached) {
+        console.log(`[Cache] Hit for keyword: "${keyword}"`);
+        rawData = cached;
+    } else {
+        rawData = await searchPansou(keyword, limit);
+        if (rawData && rawData.data) {
+            setCache(keyword, rawData);
+        }
+    }
+
     if (!rawData || !rawData.data) {
         return res.json({ code: -2, msg: 'Search API failed or empty' });
     }
