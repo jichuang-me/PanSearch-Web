@@ -340,27 +340,6 @@ h1 {
     overflow-y: auto;
 }
 
-.btn-icon-trash {
-    position: absolute;
-    bottom: 12px;
-    right: 16px;
-    background: transparent;
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    padding: 4px;
-    border-radius: 6px;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.btn-icon-trash:hover {
-    color: var(--danger);
-    background: rgba(239, 68, 68, 0.1);
-}
-
 .history-tag-item {
     display: flex;
     align-items: center;
@@ -378,6 +357,19 @@ h1 {
 .history-tag-item:hover {
     background: var(--primary);
     color: #fff;
+}
+
+.clear-all-item {
+    background: transparent;
+    border: 1px dashed rgba(129, 140, 248, 0.4);
+    color: var(--primary);
+    padding: 4px 8px;
+}
+
+.clear-all-item:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--danger);
+    border-color: rgba(239, 68, 68, 0.2);
 }
 
 .history-tag-item .del-btn {

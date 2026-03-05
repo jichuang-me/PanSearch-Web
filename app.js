@@ -128,8 +128,11 @@ const HistoryManager = {
         listEl.innerHTML = list.map(k => `
             <div class="history-tag-item" onclick="doSearch('${escAttr(k)}', 'fuzzy')">
                 <span class="text">${escHtml(k)}</span>
-                <span class="del-btn" onclick="event.stopPropagation(); HistoryManager.remove('${escAttr(k)}')">×</span>
-            </div>`).join('');
+                <span class="del-btn" title="删除该记录" onclick="event.stopPropagation(); HistoryManager.remove('${escAttr(k)}')">×</span>
+            </div>`).join('') + `
+            <button class="history-tag-item clear-all-item" title="清空全部历史记录" onclick="event.stopPropagation(); HistoryManager.clearAll()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>`;
     },
     show() { if (this.get().length) $('history-dropdown').style.display = 'block'; },
     hide() { setTimeout(() => { if ($('history-dropdown')) $('history-dropdown').style.display = 'none'; }, 200); }
@@ -166,7 +169,6 @@ function bindEvents() {
     if ($('search-exact-btn')) $('search-exact-btn').onclick = () => handleS('exact');
     if ($('results-search-btn')) $('results-search-btn').onclick = () => handleS('fuzzy');
     if ($('back-btn')) $('back-btn').onclick = showSearch;
-    if ($('clear-all-history')) $('clear-all-history').onclick = (e) => { e.stopPropagation(); HistoryManager.clearAll(); };
     if ($('refresh-discovery')) $('refresh-discovery').onclick = () => CacheManager.refreshAll();
 
     document.querySelectorAll('#main-filter .tag').forEach(tag => {
@@ -354,8 +356,20 @@ function renderSingleCard(item, idx) {
         </div>`;
 }
 
-function showSearch() { viewSearch.classList.add('active'); viewResults.classList.remove('active'); allResults = []; UISync.syncFilters(); }
-function showResults() { viewSearch.classList.remove('active'); viewResults.classList.add('active'); $('results-grid').innerHTML = ''; UISync.syncFilters(); }
+function showSearch() {
+    $('view-search').classList.add('active');
+    $('view-results').classList.remove('active');
+    allResults = [];
+    UISync.syncFilters();
+}
+
+function showResults() {
+    $('view-search').classList.remove('active');
+    $('view-results').classList.add('active');
+    $('results-grid').innerHTML = '';
+    UISync.syncFilters();
+}
+
 function setSearchLoading(on) {
     $('search-fuzzy-btn').disabled = on; $('search-exact-btn').disabled = on;
     if ($('results-search-btn')) $('results-search-btn').disabled = on;
