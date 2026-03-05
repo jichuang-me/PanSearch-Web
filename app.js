@@ -51,11 +51,12 @@ const CacheManager = {
     },
 
     async refreshAll() {
-        toast('正在同步全网最新资源...', 'info');
-        $('refresh-discovery').classList.add('loading');
+        toast('正在获取全网最新资源...', 'info');
+        const link = $('refresh-discovery');
+        if (link) link.classList.add('loading');
         await Promise.all([loadHotKeywords(true), loadDiscovery(true)]);
-        $('refresh-discovery').classList.remove('loading');
-        toast('内容已更新至最新版本', 'success');
+        if (link) link.classList.remove('loading');
+        toast('内容已同步', 'success');
     }
 };
 
@@ -163,7 +164,7 @@ function bindEvents() {
 
     if ($('search-fuzzy-btn')) $('search-fuzzy-btn').onclick = () => handleS('fuzzy');
     if ($('search-exact-btn')) $('search-exact-btn').onclick = () => handleS('exact');
-    if ($('results-search-btn')) $('results-search-btn').onclick = () => handleS('fuzzy'); // Default fuzzy on result bar
+    if ($('results-search-btn')) $('results-search-btn').onclick = () => handleS('fuzzy');
     if ($('back-btn')) $('back-btn').onclick = showSearch;
     if ($('clear-all-history')) $('clear-all-history').onclick = (e) => { e.stopPropagation(); HistoryManager.clearAll(); };
     if ($('refresh-discovery')) $('refresh-discovery').onclick = () => CacheManager.refreshAll();

@@ -31,7 +31,10 @@
                     <div class="search-bar" id="search-bar">
                         <input id="search-input" type="text" placeholder="输入关键词，如：三体、奥本海默…" autocomplete="off"
                             autofocus>
-                        <button id="search-btn">搜索</button>
+                        <div class="search-btns">
+                            <button id="search-fuzzy-btn" class="btn-fuzzy">模糊搜索</button>
+                            <button id="search-exact-btn" class="btn-exact">精确</button>
+                        </div>
                     </div>
                     <!-- Search History Dropdown -->
                     <div id="history-dropdown" class="history-dropdown" style="display: none;">
@@ -41,11 +44,6 @@
                         </div>
                         <div id="history-list" class="history-list"></div>
                     </div>
-                </div>
-
-                <div class="search-actions">
-                    <button id="search-fuzzy-btn" class="btn-primary">模糊搜索 (综合推荐)</button>
-                    <button id="search-exact-btn" class="btn-secondary">精确搜索 (极速定位)</button>
                 </div>
 
                 <div class="type-filter" id="main-filter">
@@ -70,14 +68,14 @@
             <!-- Discovery (3-column layout) -->
             <div class="discovery-header">
                 <h2>✨ 发现新鲜资源</h2>
-                <button id="refresh-discovery" class="btn-refresh" title="手动获取最新资源">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                <span id="refresh-discovery" class="refresh-link" title="点击刷新最新资源">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                         stroke-linecap="round" stroke-linejoin="round">
                         <path d="M23 4v6h-6"></path>
                         <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
                     </svg>
-                    刷新内容
-                </button>
+                    刷新
+                </span>
             </div>
             <div id="discovery" class="discovery-grid">
                 <div class="disc-col">
@@ -104,11 +102,13 @@
         <!-- ===== RESULTS VIEW ===== -->
         <section id="view-results" class="view">
             <div class="results-header">
-                <button id="back-btn" class="back-btn">← 重新搜索</button>
+                <button id="back-btn" class="back-btn">← 返回</button>
                 <div class="search-bar-wrap compact">
                     <div class="search-bar compact" id="results-search-bar">
                         <input id="results-input" type="text" placeholder="再搜一次…" autocomplete="off">
-                        <button id="results-search-btn">搜索</button>
+                        <div class="search-btns">
+                            <button id="results-search-btn" class="btn-fuzzy">搜索</button>
+                        </div>
                     </div>
                 </div>
                 <span id="result-info" class="result-info"></span>

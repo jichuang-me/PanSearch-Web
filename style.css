@@ -138,14 +138,52 @@ h1 {
     width: 100%;
 }
 
-.search-bar:focus-within {
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(129, 140, 248, .18), 0 8px 32px rgba(0, 0, 0, .3);
+.search-bar {
+    display: flex;
+    gap: 0;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    overflow: hidden;
+    transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
+    width: 100%;
+    padding-right: 4px;
+    /* Space for buttons */
 }
 
-.search-bar.compact {
-    border-radius: var(--radius);
-    margin-bottom: 0;
+.search-btns {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding-right: 2px;
+}
+
+.search-btns button {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border-radius: 100px;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.btn-fuzzy {
+    background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important;
+    color: white !important;
+}
+
+.btn-fuzzy:hover {
+    filter: brightness(1.1);
+}
+
+.btn-exact:hover {
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .search-bar input {
@@ -196,51 +234,9 @@ h1 {
     cursor: not-allowed;
 }
 
-/* ===== SEARCH ACTIONS (Parallel Buttons) ===== */
-.search-actions {
-    display: flex;
-    justify-content: center;
-    gap: 16px;
-    margin-bottom: 24px;
-}
+/* ===== SEARCH ACTIONS REMOVED (Now inside bar) ===== */
 
-.search-actions button {
-    padding: 12px 24px;
-    border-radius: 100px;
-    font-size: 0.95rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: inherit;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.btn-primary {
-    background: linear-gradient(135deg, var(--primary), var(--primary-2));
-    color: white;
-    border: none;
-    box-shadow: 0 4px 15px rgba(129, 140, 248, 0.3);
-}
-
-.btn-primary:hover {
-    filter: brightness(1.1);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(129, 140, 248, 0.4);
-}
-
-.btn-secondary {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-}
-
-.btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.3);
-    transform: translateY(-2px);
-}
+/* ===== TYPE FILTER ===== */
 
 /* ===== TYPE FILTER ===== */
 .type-filter {
@@ -385,37 +381,39 @@ h1 {
 }
 
 .discovery-header h2 {
-    font-size: 1.25rem;
+    font-size: 1rem;
     font-weight: 700;
+    color: var(--muted);
 }
 
-.btn-refresh {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    padding: 6px 14px;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    font-weight: 500;
+.refresh-link {
+    font-size: 0.75rem;
+    color: var(--primary);
     cursor: pointer;
     display: flex;
     align-items: center;
-    gap: 6px;
-    transition: all 0.2s;
+    gap: 4px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
 }
 
-.btn-refresh:hover {
-    color: var(--primary);
-    border-color: var(--primary);
-    background: rgba(129, 140, 248, 0.05);
+.refresh-link:hover {
+    opacity: 1;
+    text-decoration: underline;
 }
 
-.btn-refresh:active svg {
-    transform: rotate(180deg);
+.refresh-link.loading svg {
+    animation: rotate 1s linear infinite;
 }
 
-.btn-refresh svg {
-    transition: transform 0.4s var(--ease);
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .discovery-grid {
@@ -493,20 +491,24 @@ h1 {
 }
 
 .hot-pill {
-    background: rgba(255, 255, 255, .07);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 5px 14px;
-    border-radius: 100px;
-    font-size: .82rem;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    color: var(--muted);
+    padding: 2px 4px;
+    margin: 0;
+    font-size: 0.85rem;
     cursor: pointer;
-    transition: all .2s var(--ease);
+    transition: all 0.2s;
+    text-decoration: underline;
+    text-decoration-color: rgba(129, 140, 248, 0.3);
+    text-underline-offset: 4px;
+    display: inline-block;
 }
 
 .hot-pill:hover {
-    background: rgba(129, 140, 248, .2);
-    border-color: var(--primary);
-    transform: translateY(-2px);
+    color: var(--primary);
+    text-decoration-color: var(--primary);
 }
 
 /* Latest list */
