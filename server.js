@@ -1,13 +1,10 @@
-const express = require('express');
-const cors = require('cors');
-const axios = require('axios');
-const https = require('https');
-
-// 【调试专用】暂时关闭 SSL 校验，解决用户环境中可能存在的 SSL 协议冲突
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+const path = require('path');
 
 const app = express();
 app.use(cors());
+
+// 静态文件托管：将当前目录下的 index.html, app.js, style.css 等直接提供给浏览器
+app.use(express.static(__dirname));
 
 // 增加超时，匹配夸克 API 验证时间
 const axiosInstance = axios.create({
@@ -212,7 +209,7 @@ app.get('/api/search', async (req, res) => {
     return res.json({ code: 0, data: validResults });
 });
 
-const PORT = 3000;
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
-    console.log(`PanSearch Backend Server running on http://localhost:${PORT}`);
+    console.log(`PanSearch Backend Server running on port ${PORT}`);
 });

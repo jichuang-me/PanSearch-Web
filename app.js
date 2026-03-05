@@ -4,7 +4,7 @@
  */
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const API_BASE = 'http://localhost:3000/api/search'; // Using the local robust validator proxy
+const API_BASE = '/api/search'; // Using the local robust validator proxy
 const QUARK_LOCAL = 'http://localhost:9128';
 
 const HOT_KEYWORDS = [
