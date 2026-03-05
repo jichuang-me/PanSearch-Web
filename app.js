@@ -193,7 +193,8 @@ const SuggestionManager = {
 function bindEvents() {
     const handleS = () => {
         const val = $('search-input').value.trim();
-        if (val) doSearch(val);
+        const mode = $('precise-check')?.checked ? 'precise' : 'fuzzy';
+        if (val) doSearch(val, mode);
     };
 
     const input = $('search-input');
@@ -450,26 +451,30 @@ async function doSearch(keyword, mode = 'fuzzy') {
             const matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
             const matchesAlias = aliases.some(a => note.includes(a));
 
-            // Layer 3 & 4: Scoring & Penalty System --- STRICT MODE ---
+            // Layer 3 & 4: Scoring & Penalty System --- ADAPTIVE MODE ---
             let score = 0;
+            const isPrecise = mode === 'precise';
 
-            if (isGeneric) return; // Drop unknown/placeholder titles
+            if (isGeneric) {
+                if (isPrecise) return; // Drop unknown in precise mode
+                score = -80;
+            } else if (!matchesAny && !matchesAlias) {
+                if (isPrecise) return; // Hard drop if no keyword match in precise mode
+                score = -100; // Penalty but keep in fuzzy mode
+            } else {
+                // Positive Scoring for actual matches
+                if (note === kwLower) score += 200;
+                if (matchesAll) score += 100;
+                if (note.startsWith(kwLower)) score += 50;
+                if (matchesAny && !matchesAll) score += 30;
+                if (matchesAlias) score += 50;
+            }
 
-            // Hard Filter: If it doesn't match the keyword OR an alias, drop it immediately
-            if (!matchesAny && !matchesAlias) return;
-
-            // Positive Scoring for actual matches
-            if (note === kwLower) score += 200; // Exact match is king
-            if (matchesAll) score += 100; // Every word fragment found
-            if (note.startsWith(kwLower)) score += 50;
-            if (matchesAny && !matchesAll) score += 30;
-            if (matchesAlias) score += 50;
-
-            // Language Characteristic Penalty (Double check)
+            // Language Characteristic Penalty
             const resultHasEnglish = /[a-z]/.test(note);
             if (queryHasEnglish && !resultHasEnglish && !matchesAny) {
-                // If query is English but result is Chinese and doesn't contain any query words
-                return;
+                if (isPrecise) return; // Stricter in precise mode
+                score -= 400; // Heavy penalty in fuzzy mode
             }
 
             // Quality/Metadata Boosting

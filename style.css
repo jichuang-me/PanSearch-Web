@@ -209,6 +209,62 @@ h1 {
     display: none;
 }
 
+.precise-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 12px;
+    border-right: 1px solid var(--border);
+    user-select: none;
+    cursor: pointer;
+}
+
+.precise-toggle label {
+    font-size: 0.82rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.2s;
+    font-weight: 500;
+}
+
+.precise-toggle input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1.5px solid var(--muted);
+    border-radius: 3px;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    margin: 0;
+}
+
+.precise-toggle input[type="checkbox"]:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+}
+
+.precise-toggle input[type="checkbox"]:checked::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.precise-toggle:hover label {
+    color: var(--text);
+}
+
+.precise-toggle:hover input[type="checkbox"] {
+    border-color: var(--primary);
+}
+
 .search-bar input {
     flex: 1;
     background: transparent;
