@@ -126,10 +126,9 @@ const HistoryManager = {
         const list = this.get();
         if (!list.length) { dropdown.style.display = 'none'; return; }
         listEl.innerHTML = list.map(k => `
-            <div class="history-entry" onclick="doSearch('${escAttr(k)}', 'fuzzy')">
-                <span class="icon">🕒</span>
+            <div class="history-tag-item" onclick="doSearch('${escAttr(k)}', 'fuzzy')">
                 <span class="text">${escHtml(k)}</span>
-                <span class="del-btn" onclick="event.stopPropagation(); HistoryManager.remove('${escAttr(k)}')">✕</span>
+                <span class="del-btn" onclick="event.stopPropagation(); HistoryManager.remove('${escAttr(k)}')">×</span>
             </div>`).join('');
     },
     show() { if (this.get().length) $('history-dropdown').style.display = 'block'; },
@@ -147,7 +146,8 @@ const HistoryManager = {
 
 function bindEvents() {
     const handleS = (mode) => {
-        const input = (viewResults.classList.contains('active') ? $('results-input') : $('search-input'));
+        const vr = $('view-results');
+        const input = (vr && vr.classList.contains('active') ? $('results-input') : $('search-input'));
         const val = input.value.trim();
         if (val) doSearch(val, mode);
     };
@@ -236,7 +236,7 @@ async function doSearch(keyword, mode = 'fuzzy') {
     try {
         let results = [];
         if (mode === 'fuzzy') {
-            const pages = [1, 2];
+            const pages = [1, 2, 3, 4]; // Increased depth to 4 pages
             for (let p of pages) {
                 const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}&page=${p}`);
                 if (html) results = results.concat(parsePanSearchHtml(html));

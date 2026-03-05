@@ -31,18 +31,19 @@
                     <div class="search-bar" id="search-bar">
                         <input id="search-input" type="text" placeholder="输入关键词，如：三体、奥本海默…" autocomplete="off"
                             autofocus>
-                        <div class="search-btns">
-                            <button id="search-fuzzy-btn" class="btn-fuzzy">模糊搜索</button>
-                            <button id="search-exact-btn" class="btn-exact">精确</button>
+                        <div class="search-btn-group">
+                            <button id="search-fuzzy-btn" class="btn-group-left" title="获取全网尽可能多的资源">模糊搜索</button>
+                            <div class="btn-divider"></div>
+                            <button id="search-exact-btn" class="btn-group-right" title="仅极速匹配精准关键词">精确搜索</button>
                         </div>
                     </div>
                     <!-- Search History Dropdown -->
                     <div id="history-dropdown" class="history-dropdown" style="display: none;">
                         <div class="dropdown-header">
-                            <span>🕒 搜索历史</span>
-                            <button id="clear-all-history" class="btn-text danger">清空全部</button>
+                            <span class="history-title">🕒 搜索记录</span>
+                            <button id="clear-all-history" class="btn-text-primary">清空</button>
                         </div>
-                        <div id="history-list" class="history-list"></div>
+                        <div id="history-list" class="history-tags-cloud"></div>
                     </div>
                 </div>
 
@@ -99,15 +100,14 @@
             </div>
         </section>
 
-        <!-- ===== RESULTS VIEW ===== -->
         <section id="view-results" class="view">
             <div class="results-header">
                 <button id="back-btn" class="back-btn">← 返回</button>
                 <div class="search-bar-wrap compact">
                     <div class="search-bar compact" id="results-search-bar">
                         <input id="results-input" type="text" placeholder="再搜一次…" autocomplete="off">
-                        <div class="search-btns">
-                            <button id="results-search-btn" class="btn-fuzzy">搜索</button>
+                        <div class="search-btn-group">
+                            <button id="results-search-btn" class="btn-group-left">自动搜索</button>
                         </div>
                     </div>
                 </div>

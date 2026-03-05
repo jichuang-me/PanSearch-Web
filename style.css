@@ -153,37 +153,51 @@ h1 {
     /* Space for buttons */
 }
 
-.search-btns {
+.search-btn-group {
     display: flex;
-    gap: 4px;
-    align-items: center;
-    padding-right: 2px;
+    align-items: stretch;
+    background: linear-gradient(135deg, var(--primary), var(--primary-2));
+    border-radius: 100px;
+    box-shadow: 0 4px 15px rgba(129, 140, 248, 0.2);
+    margin: 4px;
+    min-width: fit-content;
 }
 
-.search-btns button {
+.search-btn-group button {
     background: transparent;
+    color: white;
     border: none;
-    color: var(--text);
-    padding: 8px 16px;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
-    border-radius: 100px;
-    transition: all 0.2s;
-    white-space: nowrap;
+    transition: background 0.2s;
+    letter-spacing: 0.5px;
 }
 
-.btn-fuzzy {
-    background: linear-gradient(135deg, var(--primary), var(--primary-2)) !important;
-    color: white !important;
+.search-btn-group button:hover {
+    background: rgba(255, 255, 255, 0.15);
 }
 
-.btn-fuzzy:hover {
-    filter: brightness(1.1);
+.search-btn-group button:active {
+    background: rgba(255, 255, 255, 0.25);
 }
 
-.btn-exact:hover {
-    background: rgba(255, 255, 255, 0.1);
+.btn-group-left {
+    padding: 0 16px 0 20px;
+    border-top-left-radius: 100px;
+    border-bottom-left-radius: 100px;
+}
+
+.btn-group-right {
+    padding: 0 20px 0 16px;
+    border-top-right-radius: 100px;
+    border-bottom-right-radius: 100px;
+}
+
+.btn-divider {
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+    margin: 8px 0;
 }
 
 .search-bar input {
@@ -307,10 +321,72 @@ h1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 18px;
+    padding: 8px 16px 12px;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 8px;
+    margin-bottom: 12px;
 }
+
+.history-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.btn-text-primary {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.btn-text-primary:hover {
+    color: #fff;
+}
+
+.history-tags-cloud {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 0 16px 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.history-tag-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--primary);
+    border: 1px solid rgba(129, 140, 248, 0.2);
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.history-tag-item:hover {
+    background: var(--primary);
+    color: #fff;
+}
+
+.history-tag-item .del-btn {
+    font-size: 1rem;
+    line-height: 1;
+    color: inherit;
+    opacity: 0.6;
+    padding: 0 2px;
+    transition: opacity 0.2s;
+}
+
+.history-tag-item .del-btn:hover {
+    opacity: 1;
+}
+
+/* Removes old history-entry / btn-text.danger css */
 
 .dropdown-header span {
     font-size: 0.8rem;
@@ -367,9 +443,6 @@ h1 {
     background: rgba(239, 68, 68, 0.1);
 }
 
-.btn-text.danger:hover {
-    color: var(--danger);
-}
 
 /* ===== DISCOVERY ===== */
 .discovery-header {
@@ -483,32 +556,31 @@ h1 {
     }
 }
 
-/* Hot tags */
 .hot-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 12px;
 }
 
 .hot-pill {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    color: var(--muted);
-    padding: 2px 4px;
-    margin: 0;
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-decoration: underline;
-    text-decoration-color: rgba(129, 140, 248, 0.3);
-    text-underline-offset: 4px;
-    display: inline-block;
+    color: var(--text) !important;
+    padding: 2px 4px !important;
+    margin: 0 !important;
+    font-size: 0.9rem !important;
+    cursor: pointer !important;
+    transition: color 0.2s !important;
+    text-decoration: underline !important;
+    text-decoration-color: rgba(129, 140, 248, 0.4) !important;
+    text-underline-offset: 4px !important;
+    display: inline-block !important;
 }
 
 .hot-pill:hover {
-    color: var(--primary);
-    text-decoration-color: var(--primary);
+    color: var(--primary) !important;
+    text-decoration-color: var(--primary) !important;
 }
 
 /* Latest list */
