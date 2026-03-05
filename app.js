@@ -1,6 +1,6 @@
 ﻿/**
  * PanSearch Web App
- * V4: Enhanced Search & UI Overhaul
+ * V5: Parallel Search & Manual/Hourly Refresh
  */
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -8,10 +8,7 @@ const BACKEND_URL = (window.location.protocol === 'file:')
     ? 'http://localhost:8080/api/search'
     : '/api/search';
 
-const HOT_KEYWORDS = [
-    '三体', '甄嬛传', '黑神话悟空', '权力的游戏', '流浪地球',
-    '编程入门', '考研资料', '雅思托福', 'AI教程', '设计素材'
-];
+const DEFAULT_HOT_KEYWORDS = ['三体', '甄嬛传', '黑神话悟空', '权力的游戏', '流浪地球', '编程入门', '考研资料'];
 
 const DISCOVERY_CATS = [
     { id: 'movie', label: '🎬 影视', kw: '影视' },
@@ -29,20 +26,48 @@ const DRIVE_NAMES = {
 let allResults = [];
 let activeType = 'all';
 let isSearching = false;
-let searchMode = 'exact';
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
 
+// ─── CACHE MANAGER (Hourly / Manual) ─────────────────────────────────────────
+const CacheManager = {
+    keys: { discovery: 'ps_discovery_v5', hot: 'ps_hot_v5' },
+    expiry: 3600000, // 1 hour
+
+    save(key, data) {
+        const payload = { timestamp: Date.now(), data: data };
+        localStorage.setItem(this.keys[key], JSON.stringify(payload));
+    },
+
+    get(key) {
+        const raw = localStorage.getItem(this.keys[key]);
+        if (!raw) return null;
+        try {
+            const parsed = JSON.parse(raw);
+            if (Date.now() - parsed.timestamp < this.expiry) return parsed.data;
+        } catch (e) { }
+        return null;
+    },
+
+    async refreshAll() {
+        toast('正在同步全网最新资源...', 'info');
+        $('refresh-discovery').classList.add('loading');
+        await Promise.all([loadHotKeywords(true), loadDiscovery(true)]);
+        $('refresh-discovery').classList.remove('loading');
+        toast('内容已更新至最新版本', 'success');
+    }
+};
+
 // ─── UI SYNC & RENDER ────────────────────────────────────────────────────────
 const UISync = {
     init() {
-        this.renderHotTags();
+        this.renderHotTags(CacheManager.get('hot') || DEFAULT_HOT_KEYWORDS);
         this.syncFilters();
     },
 
-    renderHotTags() {
-        const html = HOT_KEYWORDS.map(k => `<span class="hot-pill" onclick="doSearch('${k}')">${escHtml(k)}</span>`).join('');
+    renderHotTags(list) {
+        const html = list.map(k => `<span class="hot-pill" onclick="doSearch('${escAttr(k)}', 'fuzzy')">${escHtml(k)}</span>`).join('');
         const containers = [$('hot-tags'), $('results-hot')];
         containers.forEach(c => {
             if (c) {
@@ -57,7 +82,6 @@ const UISync = {
         const resultsFilter = $('results-filter');
         if (resultsFilter) {
             resultsFilter.innerHTML = filterHtml;
-            // Re-bind events for the cloned filters
             resultsFilter.querySelectorAll('.tag').forEach(tag => {
                 tag.onclick = () => this.handleFilterClick(tag);
             });
@@ -72,16 +96,11 @@ const UISync = {
     }
 };
 
-// ─── HISTORY MANAGER V4 ──────────────────────────────────────────────────────
+// ─── HISTORY MANAGER ────────────────────────────────────────────────────────
 const HistoryManager = {
-    key: 'pansearch_history_v4',
+    key: 'ps_history_v5',
     limit: 15,
-
-    get() {
-        try { return JSON.parse(localStorage.getItem(this.key) || '[]'); }
-        catch (e) { return []; }
-    },
-
+    get() { try { return JSON.parse(localStorage.getItem(this.key) || '[]'); } catch (e) { return []; } },
     add(kw) {
         if (!kw) return;
         let list = this.get().filter(i => i !== kw);
@@ -89,40 +108,29 @@ const HistoryManager = {
         localStorage.setItem(this.key, JSON.stringify(list.slice(0, this.limit)));
         this.render();
     },
-
     remove(kw) {
         let list = this.get().filter(i => i !== kw);
         localStorage.setItem(this.key, JSON.stringify(list));
         this.render();
     },
-
     clearAll() {
         if (confirm('确认清空所有搜索历史吗？')) {
             localStorage.setItem(this.key, '[]');
             this.render();
         }
     },
-
     render() {
-        const dropdown = $('history-dropdown');
-        const listEl = $('history-list');
+        const dropdown = $('history-dropdown'), listEl = $('history-list');
         if (!dropdown || !listEl) return;
-
         const list = this.get();
-        if (!list.length) {
-            dropdown.style.display = 'none';
-            return;
-        }
-
+        if (!list.length) { dropdown.style.display = 'none'; return; }
         listEl.innerHTML = list.map(k => `
-            <div class="history-entry" onclick="doSearch('${escAttr(k)}')">
+            <div class="history-entry" onclick="doSearch('${escAttr(k)}', 'fuzzy')">
                 <span class="icon">🕒</span>
                 <span class="text">${escHtml(k)}</span>
                 <span class="del-btn" onclick="event.stopPropagation(); HistoryManager.remove('${escAttr(k)}')">✕</span>
-            </div>
-        `).join('');
+            </div>`).join('');
     },
-
     show() { if (this.get().length) $('history-dropdown').style.display = 'block'; },
     hide() { setTimeout(() => { if ($('history-dropdown')) $('history-dropdown').style.display = 'none'; }, 200); }
 };
@@ -132,76 +140,87 @@ const HistoryManager = {
     bindEvents();
     UISync.init();
     loadDiscovery();
+    loadHotKeywords();
     HistoryManager.render();
 })();
 
 function bindEvents() {
-    const handleSearch = () => {
-        const val = (viewResults.classList.contains('active') ? $('results-input') : $('search-input')).value.trim();
-        if (val) doSearch(val);
+    const handleS = (mode) => {
+        const input = (viewResults.classList.contains('active') ? $('results-input') : $('search-input'));
+        const val = input.value.trim();
+        if (val) doSearch(val, mode);
     };
 
-    // Keyboard Bug Fix: Use 'keyup' and check if input is actually clearable. 
-    // The previous implementation might have been intercepting key events too aggressively or focus was lost.
     const inputs = [$('search-input'), $('results-input')];
     inputs.forEach(input => {
         if (!input) return;
         input.onkeydown = e => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                handleSearch();
-            }
+            if (e.key === 'Enter') { e.preventDefault(); handleS('fuzzy'); } // Default fuzzy
         };
         input.onfocus = () => HistoryManager.show();
         input.onblur = () => HistoryManager.hide();
     });
 
-    if ($('search-btn')) $('search-btn').onclick = handleSearch;
-    if ($('results-search-btn')) $('results-search-btn').onclick = handleSearch;
+    if ($('search-fuzzy-btn')) $('search-fuzzy-btn').onclick = () => handleS('fuzzy');
+    if ($('search-exact-btn')) $('search-exact-btn').onclick = () => handleS('exact');
+    if ($('results-search-btn')) $('results-search-btn').onclick = () => handleS('fuzzy'); // Default fuzzy on result bar
     if ($('back-btn')) $('back-btn').onclick = showSearch;
     if ($('clear-all-history')) $('clear-all-history').onclick = (e) => { e.stopPropagation(); HistoryManager.clearAll(); };
-
-    document.querySelectorAll('input[name="search-mode"]').forEach(r => {
-        r.onchange = () => { searchMode = r.value; };
-    });
+    if ($('refresh-discovery')) $('refresh-discovery').onclick = () => CacheManager.refreshAll();
 
     document.querySelectorAll('#main-filter .tag').forEach(tag => {
         tag.onclick = () => UISync.handleFilterClick(tag);
     });
 }
 
-// ─── DISCOVERY ───────────────────────────────────────────────────────────────
-async function loadDiscovery() {
-    DISCOVERY_CATS.forEach(cat => fetchAndRenderCol(cat));
+// ─── CORE LOADERS (Cache-aware) ─────────────────────────────────────────────
+async function loadHotKeywords(force = false) {
+    let kw = CacheManager.get('hot');
+    if (!kw || force) {
+        try {
+            const html = await fetchWithProxy('https://www.pansearch.me/');
+            const matches = html.match(/<a[^>]*class="[^"]*hot-item[^"]*"[^>]*>(.*?)<\/a>/g);
+            if (matches) {
+                kw = matches.map(m => m.replace(/<[^>]+>/g, '').trim()).slice(0, 10);
+                CacheManager.save('hot', kw);
+            }
+        } catch (e) { }
+    }
+    if (kw) UISync.renderHotTags(kw);
 }
 
-async function fetchAndRenderCol(cat) {
-    const el = $(`list-${cat.id}`);
-    if (!el) return;
-    try {
-        const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(cat.kw)}`);
-        if (html) renderColumnList(el, parsePanSearchHtml(html).slice(0, 8));
-        else throw new Error();
-    } catch (e) {
-        el.innerHTML = '<div class="empty-state" style="padding:10px;font-size:0.8rem">暂时无法连接</div>';
+async function loadDiscovery(force = false) {
+    let cached = CacheManager.get('discovery');
+    if (cached && !force) {
+        Object.keys(cached).forEach(id => renderColumnList($(`list-${id}`), cached[id]));
+        return;
+    }
+    const data = {};
+    for (let cat of DISCOVERY_CATS) {
+        try {
+            const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(cat.kw)}`);
+            if (html) data[cat.id] = parsePanSearchHtml(html).slice(0, 8);
+        } catch (e) { }
+    }
+    if (Object.keys(data).length) {
+        CacheManager.save('discovery', data);
+        Object.keys(data).forEach(id => renderColumnList($(`list-${id}`), data[id]));
     }
 }
 
 function renderColumnList(container, items) {
-    if (!items || !items.length) {
-        container.innerHTML = '<div class="empty-state" style="padding:10px;font-size:0.8rem">暂无资源</div>';
-        return;
-    }
+    if (!container) return;
+    if (!items || !items.length) { container.innerHTML = '<div class="empty-state">暂无资源</div>'; return; }
     container.innerHTML = items.map(item => `
-        <div class="latest-item" onclick="doSearch('${escAttr(item.note)}')">
-            <span class="type-dot dot-${DRIVE_NAMES[item.driveType] ? item.driveType : 'default'}"></span>
+        <div class="latest-item" onclick="doSearch('${escAttr(item.note)}', 'fuzzy')">
+            <span class="type-dot dot-${item.driveType || 'default'}"></span>
             <span class="latest-item-name" title="${escAttr(item.note)}">${escHtml(item.note)}</span>
             <span class="latest-item-meta">${item.datetime ? item.datetime.split('T')[0].slice(5) : ''}</span>
         </div>`).join('');
 }
 
-// ─── SEARCH ENGINE V4 ────────────────────────────────────────────────────────
-async function doSearch(keyword) {
+// ─── SEARCH ENGINE ────────────────────────────────────────────────────────────
+async function doSearch(keyword, mode = 'fuzzy') {
     if (!keyword || isSearching) return;
     isSearching = true;
     keyword = keyword.trim();
@@ -215,43 +234,26 @@ async function doSearch(keyword) {
 
     try {
         let results = [];
-        // Sequential search or Batch? Fuzzy means more pages.
-        if (searchMode === 'fuzzy') {
-            results = await fuzzySearch(keyword);
+        if (mode === 'fuzzy') {
+            const pages = [1, 2];
+            for (let p of pages) {
+                const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}&page=${p}`);
+                if (html) results = results.concat(parsePanSearchHtml(html));
+            }
+            results = Array.from(new Set(results.map(a => a.url))).map(url => results.find(a => a.url === url));
         } else {
             const data = await tryFetchBackend(keyword) || await serverlessSearch(keyword);
             results = data ? data.data : [];
         }
-
         allResults = results || [];
         renderCards(allResults);
     } catch (e) {
-        toast('搜索失败，请刷新重试', 'error');
+        toast('搜索失败，检查网络后重试', 'error');
         renderCards([]);
     } finally {
         isSearching = false;
         setSearchLoading(false);
     }
-}
-
-async function fuzzySearch(kw) {
-    // Basic fuzzy: split keyword into parts and search, plus fetch multiple pages if possible.
-    // For pansearch.me, we can try multiple common keywords or just more parsing.
-    const pages = [1, 2];
-    let combined = [];
-    for (let p of pages) {
-        try {
-            const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(kw)}&page=${p}`);
-            if (html) combined = combined.concat(parsePanSearchHtml(html));
-        } catch (e) { }
-    }
-    // Remove duplicates
-    const seen = new Set();
-    return combined.filter(it => {
-        if (seen.has(it.url)) return false;
-        seen.add(it.url);
-        return true;
-    });
 }
 
 async function tryFetchBackend(kw) {
@@ -290,7 +292,6 @@ function parsePanSearchHtml(html) {
         else if (url.includes('xunlei')) driveType = 'xunlei';
         else if (url.includes('139.com')) driveType = 'mobile';
         else if (url.includes('189.cn')) driveType = 'telecom';
-        else if (url.includes('wo.cn')) driveType = 'telecom';
         else if (url.includes('pikpak')) driveType = 'pikpak';
         else if (url.includes('115.com')) driveType = '115';
 
@@ -305,28 +306,19 @@ function renderCards(list) {
     const filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
     const grid = $('results-grid');
     if (!grid) return;
-
     $('result-info').textContent = filtered.length ? `为你搜索到 ${filtered.length} 条资源` : '未发现有效链接';
     if (!filtered.length) {
         grid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>换个关键词试试？</p></div>`;
         return;
     }
-
     const groups = {};
-    filtered.forEach(it => {
-        const type = it.driveType || 'other';
-        (groups[type] = groups[type] || []).push(it);
-    });
-
+    filtered.forEach(it => { (groups[it.driveType || 'other'] = groups[it.driveType || 'other'] || []).push(it); });
     const sortedTypes = Object.keys(groups).sort((a, b) => {
         const p = { 'aliyun': 1, 'quark': 2, 'baidu': 3, 'uc': 4, 'xunlei': 5, 'mobile': 6, 'telecom': 7, 'pikpak': 8, '115': 9, 'other': 10 };
         return (p[a] || 99) - (p[b] || 99);
     });
-
     grid.innerHTML = sortedTypes.map(type => {
-        const items = groups[type];
-        const visible = items.slice(0, 2);
-        const hidden = items.slice(2);
+        const items = groups[type], visible = items.slice(0, 2), hidden = items.slice(2);
         const gid = `g-${type.replace(/[^ac-z0-9]/g, '')}`;
         return `
             <div class="result-group">
@@ -358,11 +350,10 @@ function renderSingleCard(item, idx) {
 
 function showSearch() { viewSearch.classList.add('active'); viewResults.classList.remove('active'); allResults = []; UISync.syncFilters(); }
 function showResults() { viewSearch.classList.remove('active'); viewResults.classList.add('active'); $('results-grid').innerHTML = ''; UISync.syncFilters(); }
-
 function setSearchLoading(on) {
-    $('search-btn').disabled = on;
+    $('search-fuzzy-btn').disabled = on; $('search-exact-btn').disabled = on;
     if ($('results-search-btn')) $('results-search-btn').disabled = on;
-    if (on) $('results-grid').innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><p>正在智能抓取高质量资源...</p></div>`;
+    if (on) $('results-grid').innerHTML = `<div class="loading-state"><div class="loading-spinner"></div><p>正在智能抓取全网高质量资源...</p></div>`;
 }
 
 async function fetchWithProxy(url) {
@@ -372,17 +363,14 @@ async function fetchWithProxy(url) {
     } catch (e) { }
     try {
         const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-        return res.ok ? await res.ok.text() : null;
+        return res.ok ? await res.text() : null;
     } catch (e) { }
     return null;
 }
 
 function toggleGroup(gid) {
     const h = $(`${gid}-h`), b = $(`${gid}-b`);
-    if (h && b) {
-        const active = h.classList.toggle('active');
-        b.textContent = active ? '收起结果' : `展开其余 (${h.children.length})`;
-    }
+    if (h && b) { const active = h.classList.toggle('active'); b.textContent = active ? '收起结果' : `展开其余 (${h.children.length})`; }
 }
 
 async function quarkSave(u) {
@@ -395,18 +383,12 @@ async function quarkSave(u) {
     } catch { window.open(u, '_blank'); }
 }
 
-function copyUrl(u) {
-    navigator.clipboard.writeText(u).then(() => toast('链接已复制', 'success'));
-}
-
+function copyUrl(u) { navigator.clipboard.writeText(u).then(() => toast('链接已复制', 'success')); }
 function toast(m, t = 'info') {
-    const c = $('toast-container');
-    const el = document.createElement('div'); el.className = `toast ${t}`; el.textContent = m;
-    c.appendChild(el);
-    setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2500);
+    const c = $('toast-container'); const el = document.createElement('div'); el.className = `toast ${t}`; el.textContent = m;
+    c.appendChild(el); setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 300); }, 2500);
 }
-
 function escHtml(s) { return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); }
 function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
-window.doSearch = doSearch; window.HistoryManager = HistoryManager; window.toggleGroup = toggleGroup; window.copyUrl = copyUrl; window.showSearch = showSearch;
+window.doSearch = doSearch; window.HistoryManager = HistoryManager; window.toggleGroup = toggleGroup; window.copyUrl = copyUrl; window.showSearch = showSearch; window.CacheManager = CacheManager;
