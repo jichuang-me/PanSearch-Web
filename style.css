@@ -177,7 +177,7 @@ h1 {
 }
 
 .search-btn-minimal button:hover {
-    background: rgba(129, 140, 248, 0.15);
+    background: transparent;
     color: var(--primary-2);
     transform: scale(1.1);
 }
