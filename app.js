@@ -84,6 +84,14 @@ function classifyResource(item) {
     return "其他";
 }
 
+function getCatClass(cat) {
+    const map = {
+        '电影': 'movie', '电视剧': 'drama', '综艺': 'show', '体育': 'sports',
+        '音乐': 'music', '资料': 'doc', '综合': 'mix', '其他': 'other'
+    };
+    return `type-tag-${map[cat] || 'other'}`;
+}
+
 // ─── CACHE MANAGER (Hourly / Manual) ─────────────────────────────────────────
 const CacheManager = {
     keys: { discovery: 'ps_discovery_v5', hot: 'ps_hot_v5' },
@@ -760,7 +768,7 @@ function renderSingleCard(item, idx) {
                     </div>
                 </div>
                 <div class="list-item-actions">
-                    <span class="type-tag-mini">${escHtml(catName)}</span>
+                    <span class="type-tag-mini ${getCatClass(catName)}">${escHtml(catName)}</span>
                     <span class="validity-indicator" title="资源可能有效"><span class="valid-dot"></span></span>
                     <button class="btn-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(item.url)}')">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
@@ -788,7 +796,7 @@ function renderSingleCard(item, idx) {
                                 ${m.from ? `<span class="nested-tag-mini source">${escHtml(m.from)}</span>` : ''}
                                 <span class="nested-sharer">${escHtml(m.sharer || '匿名')}</span>
                                 <span class="nested-date">${m.datetime ? m.datetime.split('T')[0] : ''}</span>
-                                <span class="type-tag-mini">${escHtml(classifyResource(m))}</span>
+                                <span class="type-tag-mini ${getCatClass(classifyResource(m))}">${escHtml(classifyResource(m))}</span>
                                 <span class="valid-dot mini"></span>
                                 <div class="nested-actions">
                                     ${mType === 'quark' ? `
