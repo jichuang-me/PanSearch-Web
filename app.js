@@ -4,7 +4,10 @@
  */
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const API_BASE = '/api/search'; // Using the local robust validator proxy
+// 自动检测 API 基础路径：支持本地直接打开 HTML 文件和通过服务器访问
+const API_BASE = (window.location.protocol === 'file:')
+    ? 'http://localhost:8080/api/search'
+    : '/api/search';
 const QUARK_LOCAL = 'http://localhost:9128';
 
 const HOT_KEYWORDS = [
