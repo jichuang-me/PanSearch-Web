@@ -63,6 +63,27 @@ function mapType(url) {
     return 'other';
 }
 
+function classifyResource(item) {
+    const title = (item.note || item.title || "").toLowerCase();
+    const cat = (item.category_name || item.category || "").toLowerCase();
+
+    // 1. 资料/学习
+    if (/pdf|epub|mobi|azw3|doc|docx|ppt|xls|教程|学习|备考|考试|资料|讲义|电子书|课程|源码|代码/.test(title + cat)) return "资料";
+    // 2. 体育
+    if (/足球|篮球|nba|cba|中超|欧冠|英超|赛程|录像|锦标赛|奥运|体育/.test(title + cat)) return "体育";
+    // 3. 综艺
+    if (/综艺|真人秀|脱口秀|晚会|盛典|娱乐版|更新至.*期|期|202\d\d\d\d\d/.test(title + cat)) return "综艺";
+    // 4. 音乐
+    if (/mp3|flac|ape|wav|音乐|专辑|歌曲|歌单|演唱会/.test(title + cat)) return "音乐";
+    // 5. 电视剧
+    if (/电视剧|剧集|更新至|全集|第.*集|s\d+e\d+|season|ep\d+|集/.test(title + cat)) return "电视剧";
+    // 6. 电影
+    if (/电影|蓝光|1080p|2160p|4k|bdrip|web-dl|h26[45]|x26[45]|idx|sub|国语|中英|字幕/.test(title + cat)) return "电影";
+
+    if (cat.includes('综合') || cat.includes('其他')) return "综合";
+    return "其他";
+}
+
 // ─── CACHE MANAGER (Hourly / Manual) ─────────────────────────────────────────
 const CacheManager = {
     keys: { discovery: 'ps_discovery_v5', hot: 'ps_hot_v5' },
@@ -734,7 +755,7 @@ function renderSingleCard(item, idx) {
     // Unique ID for nested toggle
     const nid = `nid-${Math.random().toString(36).substr(2, 9)}`;
 
-    const catName = item.category_name || (item.tags ? item.tags[0] : null) || '资源';
+    const catName = classifyResource(item);
 
     return `
         <div class="list-item-wrapper">
@@ -771,7 +792,7 @@ function renderSingleCard(item, idx) {
         return `
                         <div class="nested-item" onclick="${mClick}">
                             <div class="nested-item-left">
-                                <span class="type-tag-mini">${escHtml(m.category_name || (m.tags ? m.tags[0] : null) || '资源')}</span>
+                                <span class="type-tag-mini">${escHtml(classifyResource(m))}</span>
                                 <span class="nested-url-title text-truncate">${escHtml(m.title || m.note || m.url)}</span>
                                 ${m.pwd ? `<span class="nested-tag-mini pwd">🔑 ${escHtml(m.pwd)}</span>` : ''}
                                 ${m.size ? `<span class="nested-tag-mini size">💾 ${escHtml(m.size)}</span>` : ''}
