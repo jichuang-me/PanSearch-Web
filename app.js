@@ -48,6 +48,21 @@ function normalizeTitle(s) {
     return s.replace(/[【】\[\]\s\-\.\(\)]/g, "").toLowerCase().trim();
 }
 
+function mapType(url) {
+    if (!url) return 'other';
+    const u = url.toLowerCase();
+    if (u.includes('quark.cn')) return 'quark';
+    if (u.includes('pan.baidu.com')) return 'baidu';
+    if (u.includes('alipan.com') || u.includes('aliyundrive.com')) return 'aliyun';
+    if (u.includes('uc.cn')) return 'uc';
+    if (u.includes('xunlei.com')) return 'xunlei';
+    if (u.includes('139.com')) return 'mobile';
+    if (u.includes('189.cn')) return 'telecom';
+    if (u.includes('pikpak') || u.includes('mypikpak')) return 'pikpak';
+    if (u.includes('115.com')) return '115';
+    return 'other';
+}
+
 // ─── CACHE MANAGER (Hourly / Manual) ─────────────────────────────────────────
 const CacheManager = {
     keys: { discovery: 'ps_discovery_v5', hot: 'ps_hot_v5' },
@@ -365,21 +380,6 @@ async function loadLatestFeed(type = 'all') {
                 }
             }
         });
-
-        const mapType = (url) => {
-            if (!url) return 'other';
-            const u = url.toLowerCase();
-            if (u.includes('quark.cn')) return 'quark';
-            if (u.includes('pan.baidu.com')) return 'baidu';
-            if (u.includes('alipan.com') || u.includes('aliyundrive.com')) return 'aliyun';
-            if (u.includes('uc.cn')) return 'uc';
-            if (u.includes('xunlei.com')) return 'xunlei';
-            if (u.includes('139.com')) return 'mobile';
-            if (u.includes('189.cn')) return 'telecom';
-            if (u.includes('pikpak') || u.includes('mypikpak')) return 'pikpak';
-            if (u.includes('115.com')) return '115';
-            return 'other';
-        };
 
         let feed = records.map(item => {
             const title = (item.note || item.title || item.note_ext || "").trim();
@@ -760,18 +760,37 @@ function renderSingleCard(item, idx) {
             </div>
             ${hasMembers ? `
                 <div id="${nid}" class="nested-items" style="display:none">
-                    ${item.members.map(m => `
-                        <div class="nested-item" onclick="window.open('${escAttr(m.url)}', '_blank')">
+                    ${item.members.map(m => {
+        const mType = mapType(m.url); // Use the existing mapType helper
+        const mClick = (mType === 'quark') ? `quarkSave('${escAttr(m.url)}')` : `window.open('${escAttr(m.url)}', '_blank')`;
+        return `
+                        <div class="nested-item" onclick="${mClick}">
                             <div class="nested-item-left">
                                 <span class="nested-url-title text-truncate">${escHtml(m.title || m.note || m.url)}</span>
+                                ${m.pwd ? `<span class="nested-tag-mini pwd">🔑 ${escHtml(m.pwd)}</span>` : ''}
+                                ${m.size ? `<span class="nested-tag-mini size">💾 ${escHtml(m.size)}</span>` : ''}
                             </div>
                             <div class="nested-item-right">
+                                ${m.from ? `<span class="nested-tag-mini source">${escHtml(m.from)}</span>` : ''}
                                 <span class="nested-sharer">${escHtml(m.sharer || '匿名')}</span>
                                 <span class="nested-date">${m.datetime ? m.datetime.split('T')[0] : ''}</span>
                                 <span class="valid-dot mini"></span>
+                                <div class="nested-actions">
+                                    ${mType === 'quark' ? `
+                                        <button class="btn-icon mini-icon" title="保存到夸克" onclick="event.stopPropagation(); quarkSave('${escAttr(m.url)}')">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                                        </button>
+                                    ` : ''}
+                                    <button class="btn-icon mini-icon" title="复制链接" onclick="event.stopPropagation(); copyUrl('${escAttr(m.url)}')">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                                    </button>
+                                    <button class="btn-icon mini-icon" title="浏览器打开" onclick="event.stopPropagation(); window.open('${escAttr(m.url)}', '_blank')">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
+                        </div>`;
+    }).join('')}
                 </div>
             ` : ''}
         </div>`;

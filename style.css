@@ -1176,23 +1176,25 @@ h1 {
 }
 
 .nested-items {
-    padding: 2px 0 12px 0;
-    background: rgba(255, 255, 255, 0.015);
-    border-left: none;
-    margin-left: 0;
+    padding: 0 !important;
+    background: rgba(255, 255, 255, 0.01);
+    border-left: none !important;
+    margin-left: 0 !important;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 1px;
     animation: fade-down 0.2s ease;
+    width: 100%;
 }
 
 .nested-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 8px;
-    background: rgba(255, 255, 255, 0.025);
-    border-radius: 4px;
+    padding: 10px 8px;
+    /* Match parent's 8px horizontal padding */
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
     cursor: pointer;
     transition: all 0.2s;
     font-size: 0.82rem;
@@ -1211,7 +1213,15 @@ h1 {
     align-items: center;
     gap: 12px;
     flex-shrink: 0;
-    margin-left: 12px;
+    margin-left: auto;
+    /* Push to right */
+}
+
+.nested-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 8px;
 }
 
 .nested-sharer {
@@ -1231,8 +1241,45 @@ h1 {
 .nested-url-title {
     color: var(--text);
     opacity: 0.85;
-    flex: 1;
+    flex: 0 1 auto;
+    /* Don't force full width if not needed */
     margin-right: 12px;
+}
+
+.nested-tag-mini {
+    padding: 1px 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    font-size: 0.72rem;
+    color: var(--muted);
+    white-space: nowrap;
+    opacity: 0.7;
+}
+
+.nested-tag-mini.pwd {
+    color: var(--warning);
+    border-color: rgba(247, 181, 0, 0.2);
+}
+
+.nested-tag-mini.size {
+    color: var(--primary);
+    border-color: rgba(129, 140, 248, 0.2);
+}
+
+.nested-tag-mini.source {
+    color: #94a3b8;
+    font-style: italic;
+}
+
+.mini-icon {
+    padding: 4px !important;
+    opacity: 0.5;
+}
+
+.mini-icon:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.1);
 }
 
 .nested-date {
