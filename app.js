@@ -395,20 +395,26 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
             // Stage 1: smart relevance check (multi-keyword + alias)
             const isGeneric = note === "未知资源" || note === "";
-            // We relax the filter to allow partial matches if the backend returned it, 
-            // but we boost the score if it matches all query fragments perfectly.
-            const matchesAll = kws.every(k => note.includes(k) || kwLower.includes(note));
+            // Perfect match: every keyword fragment is found in the title
+            const matchesAll = kws.length > 0 && kws.every(k => note.includes(k));
+            // Partial match: at least one keyword fragment is found
             const matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
             const matchesAlias = aliases.some(a => note.includes(a));
 
-            // If it doesn't match ANY keyword part AND no alias matches, drop it to avoid garbage
-            if (!isGeneric && !matchesAny && !matchesAlias) return;
-
             // Stage 2: Quality/Recency Scoring
             let score = 0;
-            if (matchesAll) score += 20; // Boost perfect matches
-            if (note === kwLower) score += 50; // Exact title match
-            if (note.startsWith(kwLower)) score += 30;
+
+            // If the keyword is completely absent from the title, it might be a semantic match from the API 
+            // (or it might be total garbage). We don't drop it outright anymore, but we score it very low (0 or negative)
+            // so that if there are actual good matches, they float to the top.
+            if (!isGeneric && !matchesAny && !matchesAlias) {
+                score = -50;
+            } else {
+                if (matchesAll) score += 20; // Boost perfect matches
+                if (note === kwLower) score += 50; // Exact title match
+                if (note.startsWith(kwLower)) score += 30;
+            }
+
             if (item.driveType === 'quark') score += 10; // User preferred platform
 
             // Recency weighting
