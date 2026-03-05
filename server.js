@@ -1,4 +1,11 @@
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios');
+const https = require('https');
 const path = require('path');
+
+// 【重要】后端搜索代理环境下的 SSL 兼容性处理
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const app = express();
 app.use(cors());
