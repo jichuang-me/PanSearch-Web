@@ -17,7 +17,8 @@ const DISCOVERY_CATS = [
     { id: 'movie', label: '🎬 影视', kw: '影视' },
     { id: 'music', label: '🎵 音乐', kw: '音乐' },
     { id: 'software', label: '💻 软件', kw: '软件' },
-    { id: 'doc', label: '📚 学习', kw: '资料' }
+    { id: 'doc', label: '📚 学习', kw: '资料' },
+    { id: 'other', label: '📦 其他', kw: '资源' }
 ];
 
 // Drive Name Map for Grouping
@@ -133,11 +134,11 @@ function renderColumnList(container, items) {
         return;
     }
     container.innerHTML = items.map(item => {
-        const driveKey = item.driveType in { 'quark': 1, 'baidu': 1, 'aliyun': 1, 'uc': 1, 'xunlei': 1, 'mobile': 1, 'telecom': 1, 'pikpak': 1 } ? item.driveType : 'default';
+        const driveKey = item.driveType in DRIVE_NAMES ? item.driveType : 'other';
         const dotClass = `dot-${driveKey}`;
         return `<div class="latest-item" onclick="doSearch('${escAttr(item.note)}')">
             <span class="type-dot ${dotClass}"></span>
-            <span class="latest-item-name">${escHtml(item.note)}</span>
+            <span class="latest-item-name" title="${escAttr(item.note)}">${escHtml(item.note)}</span>
             <span class="latest-item-meta">${item.datetime ? item.datetime.split('T')[0].slice(5) : ''}</span>
         </div>`;
     }).join('');
@@ -152,7 +153,7 @@ async function doSearch(keyword) {
     if (resultsInput) resultsInput.value = keyword;
 
     showResults();
-    if (resultInfo) resultInfo.textContent = `正在聚合搜索 "${keyword}"…`;
+    if (resultInfo) resultInfo.textContent = `正在强力聚合 "${keyword}" 的极速资源…`;
     setSearchLoading(true);
 
     try {
@@ -163,17 +164,10 @@ async function doSearch(keyword) {
 
         if (data && data.code === 0) {
             allResults = data.data || [];
-            if (allResults.length === 0) {
-                if (resultInfo) resultInfo.textContent = `未发现 "${keyword}" 的有效链接`;
-                renderCards([]);
-            } else {
-                renderCards(allResults);
-                if (resultInfo) resultInfo.textContent = `为你搜索到 ${allResults.length} 条资源`;
-            }
+            renderCards(allResults);
         }
     } catch (e) {
-        toast('搜索中断，请稍后重试', 'error');
-        if (resultInfo) resultInfo.textContent = `网络异常，搜索失败`;
+        toast('聚合搜索失败，请尝试刷新页面', 'error');
         renderCards([]);
     } finally {
         isSearching = false;
@@ -196,41 +190,28 @@ async function serverlessSearch(keyword) {
     try {
         const html = await fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}`);
         if (!html) return null;
-
         const rawItems = parsePanSearchHtml(html);
-        const filtered = rawItems.filter(it =>
-            it.note.toLowerCase().includes(keyword.toLowerCase()) ||
-            keyword.toLowerCase().includes(it.note.toLowerCase())
-        ).slice(0, 50); // Fetch more for grouping
-
-        return { code: 0, data: filtered };
+        return { code: 0, data: rawItems };
     } catch (e) { return null; }
 }
 
 function parsePanSearchHtml(html) {
     const items = [];
     const driveRegex = /href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|www\.aliyundrive\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn|yun\.139\.com|cloud\.189\.cn|pan\.wo\.cn|115\.com|mypikpak\.com)\/s\/[a-zA-Z0-9_\-]+)"/gi;
-
     let match;
     const seenUrls = new Set();
-
     while ((match = driveRegex.exec(html)) !== null) {
         const url = match[1];
         if (seenUrls.has(url)) continue;
         seenUrls.add(url);
-
         const pos = match.index;
         const lookBack = html.substring(Math.max(0, pos - 600), pos);
-
         const h5Match = lookBack.match(/<h5[^>]*>(.*?)<\/h5>/i);
         const listMatch = lookBack.match(/(\d+、|【)(.*?)(:|<|\n|】)/i);
-
         let title = "未知资源";
         if (h5Match) title = h5Match[1];
         else if (listMatch) title = listMatch[2];
-
         title = title.replace(/<[^>]+>/g, '').trim();
-
         let driveType = 'other';
         if (url.includes('quark')) driveType = 'quark';
         else if (url.includes('baidu')) driveType = 'baidu';
@@ -242,13 +223,7 @@ function parsePanSearchHtml(html) {
         else if (url.includes('wo.cn')) driveType = 'telecom';
         else if (url.includes('pikpak')) driveType = 'pikpak';
         else if (url.includes('115.com')) driveType = '115';
-
-        items.push({
-            note: title,
-            url: url,
-            driveType: driveType,
-            datetime: new Date().toISOString()
-        });
+        items.push({ note: title, url: url, driveType: driveType, datetime: new Date().toISOString() });
     }
     return items;
 }
@@ -258,12 +233,14 @@ function renderCards(list) {
     if (!resultsGrid) return;
     const filtered = activeType === 'all' ? list : list.filter(i => i.driveType === activeType);
 
+    if (resultInfo) resultInfo.textContent = filtered.length ? `为你搜索到 ${filtered.length} 条资源` : '未发现有效链接';
+
     if (!filtered.length) {
         resultsGrid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>换个关键词试试？</p></div>`;
         return;
     }
 
-    // Grouping Logic
+    // 1. Mandatory Grouping
     const groups = {};
     filtered.forEach(item => {
         const type = item.driveType || 'other';
@@ -271,18 +248,19 @@ function renderCards(list) {
         groups[type].push(item);
     });
 
-    // Sort groups so major drives appear first
+    // 2. Clear Priority Sort
     const sortedTypes = Object.keys(groups).sort((a, b) => {
         const priority = { 'aliyun': 1, 'quark': 2, 'baidu': 3, 'uc': 4, 'xunlei': 5, 'mobile': 6, 'telecom': 7, 'pikpak': 8, '115': 9, 'other': 10 };
         return (priority[a] || 99) - (priority[b] || 99);
     });
 
+    // 3. Render Grouped UI
     resultsGrid.innerHTML = sortedTypes.map(type => {
         const items = groups[type];
         const driveName = DRIVE_NAMES[type] || '其他网盘';
         const visibleItems = items.slice(0, 2);
         const hiddenItems = items.slice(2);
-        const groupId = `group-${type}`;
+        const groupId = `group-${type.replace(/[^a-z]/g, '')}`;
 
         return `
             <div class="result-group">
@@ -308,7 +286,7 @@ function renderCards(list) {
 
 function renderSingleCard(item, idx) {
     const type = item.driveType || 'other';
-    const badgeClass = `badge-${['quark', 'baidu', 'aliyun', 'uc', 'xunlei', 'mobile', 'telecom', 'pikpak'].includes(type) ? type : 'other'}`;
+    const badgeClass = `badge-${['quark', 'baidu', 'aliyun', 'uc', 'xunlei', 'mobile', 'telecom', 'pikpak', '115'].includes(type) ? type : 'other'}`;
     const onClickAction = (type === 'quark') ? `quarkSave('${escAttr(item.url)}')` : `window.open('${escAttr(item.url)}', '_blank')`;
     return `
         <div class="card card-clickable" style="margin-bottom:10px; animation-delay:${Math.min(idx * 0.03, 0.4)}s" onclick="${onClickAction}">
