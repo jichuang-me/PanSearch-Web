@@ -272,48 +272,76 @@ async function doSearch(keyword, mode = 'fuzzy') {
     }, 150);
 
     try {
-        // Parallel fetch with abort logic
-        const pages = [1, 2, 3, 4];
+        // V15: High-speed parallel 10-page fetch via PanSou JSON API
+        const pages = Array.from({ length: 10 }, (_, i) => i + 1);
         const fetchPromises = pages.map(p =>
-            fetchWithProxy(`https://www.pansearch.me/search?keyword=${encodeURIComponent(keyword)}&page=${p}`)
+            fetchWithProxy(`https://s.panhunt.com/api/search?q=${encodeURIComponent(keyword)}&page=${p}&limit=20`)
         );
 
-        const htmlResults = await Promise.all(fetchPromises);
+        const responses = await Promise.all(fetchPromises);
         if (signal.aborted) return;
 
-        let results = [];
-        htmlResults.forEach(html => {
-            if (html) results = results.concat(parsePanSearchHtml(html));
-        });
-
-        // Deduplicate and Quality Filter
-        const uniqueResults = [];
-        const seenUrls = new Set();
-
-        results.forEach(item => {
-            if (!seenUrls.has(item.url)) {
-                // High quality filter: title matches keyword or interesting parts
-                const titleLower = item.note.toLowerCase();
-                const kwLower = keyword.toLowerCase();
-                if (titleLower.includes(kwLower) || kwLower.includes(titleLower)) {
-                    item.score = 10;
-                } else {
-                    item.score = 5;
+        let allRecords = [];
+        responses.forEach(resp => {
+            if (!resp) return;
+            try {
+                // Handle both raw strings (from AllOrigins) and parsed objects
+                const json = typeof resp === 'string' ? JSON.parse(resp) : resp;
+                if (json.code === 0 && json.data && json.data.merged_by_type) {
+                    const typedData = json.data.merged_by_type;
+                    Object.keys(typedData).forEach(t => {
+                        allRecords = allRecords.concat(typedData[t].map(item => ({ ...item, driveType: t })));
+                    });
                 }
-                uniqueResults.push(item);
-                seenUrls.add(item.url);
+            } catch (e) {
+                // Fallback to HTML parsing if JSON fails
+                if (typeof resp === 'string') allRecords = allRecords.concat(parsePanSearchHtml(resp));
             }
         });
 
-        // Sort by score (quality) then by date (if possible)
-        uniqueResults.sort((a, b) => b.score - a.score);
+        // V15: Precision Multi-Stage Filter & Scorer
+        const uniqueResults = [];
+        const seenUrls = new Set();
+        const kwLower = keyword.toLowerCase();
+
+        allRecords.forEach(item => {
+            if (!item.url || seenUrls.has(item.url)) return;
+
+            const note = (item.note || '').toLowerCase();
+            // Stage 1: strict relevance check
+            if (!note.includes(kwLower) && !kwLower.includes(note)) return;
+
+            // Stage 2: Quality/Recency Scoring
+            let score = 0;
+            if (note === kwLower) score += 50; // Exact title match
+            if (note.startsWith(kwLower)) score += 30;
+            if (item.driveType === 'quark') score += 10; // User preferred platform
+
+            // Recency weighting
+            if (item.datetime) {
+                const daysOld = (new Date() - new Date(item.datetime)) / (1000 * 3600 * 24);
+                if (daysOld < 7) score += 20; // Very fresh (latest)
+                else if (daysOld < 30) score += 10;
+            }
+
+            item.score = score;
+            uniqueResults.push(item);
+            seenUrls.add(item.url);
+        });
+
+        // V15: Sort: Highest Score first, then newest datetime
+        uniqueResults.sort((a, b) => {
+            if (b.score !== a.score) return b.score - a.score;
+            return new Date(b.datetime || 0) - new Date(a.datetime || 0);
+        });
 
         if (signal.aborted) return;
-        allResults = uniqueResults || [];
+        allResults = uniqueResults;
         renderCards(allResults);
     } catch (e) {
         if (e.name === 'AbortError') return;
-        toast('搜索失败，检查网络后重试', 'error');
+        console.error('Search engine error:', e);
+        toast('搜索受阻，请稍后刷新重试', 'error');
         renderCards([]);
     } finally {
         if (!signal.aborted) {
@@ -449,19 +477,25 @@ async function fetchWithProxy(url) {
         } catch (e) { return null; }
     };
 
-    // Try AllOrigins (Fastest usually if it works)
+    // V15: High Performance Proxy Chain
+    // Try CorsProxy first (often cleaner for raw JSON data)
     try {
-        const res = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`, 4000);
+        const res = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(url)}`, 4000);
         if (res && res.ok) {
-            const j = await res.json();
-            if (j.contents) return j.contents;
+            const text = await res.text();
+            try { return JSON.parse(text); } catch (e) { return text; }
         }
     } catch (e) { }
 
-    // Fallback to CorsProxy
+    // Fallback to AllOrigins (Very robust for GET)
     try {
-        const res = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(url)}`, 5000);
-        if (res && res.ok) return await res.text();
+        const res = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`, 5000);
+        if (res && res.ok) {
+            const j = await res.json();
+            if (j.contents) {
+                try { return JSON.parse(j.contents); } catch (e) { return j.contents; }
+            }
+        }
     } catch (e) { }
 
     return null;
