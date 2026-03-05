@@ -22,11 +22,7 @@ const DRIVE_NAMES = {
     'pikpak': 'PikPak', '115': '115网盘', 'other': '其他资源'
 };
 
-const DRIVE_DOMAINS = [
-    'pan.quark.cn', 'www.alipan.com', 'www.aliyundrive.com', 'pan.baidu.com',
-    'pan.xunlei.com', 'drive.uc.cn', 'yun.139.com', 'cloud.189.cn',
-    'pan.wo.cn', '115.com', 'mypikpak.com'
-];
+const DRIVE_DOMAINS = ['quark.cn', 'pan.baidu.com', 'alipan.com', 'aliyundrive.com', 'drive.uc.cn', 'pan.xunlei.com', 'yun.139.com', 'cloud.189.cn', 'mypikpak.com', '115.com'];
 
 // Simple Alias & Pinyin Mapping for fuzzier broad search
 const KEYWORD_ALIASES = {
@@ -42,6 +38,7 @@ let allResults = [];
 let activeType = 'all';
 let isSearching = false;
 let searchController = null; // For interrupting active searches
+let GroupCache = {}; // Cache for hidden results
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
 const $ = id => document.getElementById(id);
@@ -668,15 +665,18 @@ function renderCards(list) {
         const p = { 'aliyun': 1, 'quark': 2, 'baidu': 3, 'uc': 4, 'xunlei': 5, 'mobile': 6, 'telecom': 7, 'pikpak': 8, '115': 9, 'other': 10 };
         return (p[a] || 99) - (p[b] || 99);
     });
+    GroupCache = {}; // Reset cache on new render
     grid.innerHTML = sortedTypes.map(type => {
         const items = groups[type], visible = items.slice(0, 10), hidden = items.slice(10);
         const gid = `g-${type.replace(/[^ac-z0-9]/g, '')}`;
+        if (hidden.length) GroupCache[gid] = hidden;
+
         return `
             <div class="result-group" id="group-${type}">
                 <div class="group-header"><span class="group-title">${escHtml(DRIVE_NAMES[type] || '其他')}</span><div class="group-line"></div></div>
                 <div class="group-visible" id="${gid}-v">${visible.map((it, idx) => renderSingleCard(it, idx)).join('')}</div>
                 ${hidden.length ? `
-                    <div id="${gid}-h" class="hidden-results" data-full-list='${escAttr(JSON.stringify(hidden))}'></div>
+                    <div id="${gid}-h" class="hidden-results"></div>
                     <button class="show-more-btn" onclick="toggleGroup('${gid}')" id="${gid}-b">加载更多... (${hidden.length})</button>
                 ` : ''}
             </div>`;
@@ -720,34 +720,36 @@ function renderSingleCard(item, idx) {
 }
 
 function toggleGroup(gid) {
-    const h = $(`${gid}-h`), b = $(`${gid}-b`), v = $(`${gid}-v`);
-    if (h && b && v) {
-        const listStr = h.getAttribute('data-full-list');
-        if (!listStr) return;
+    const b = $(`${gid}-b`), v = $(`${gid}-v`);
+    if (b && v && GroupCache[gid]) {
+        const list = GroupCache[gid];
+        if (!list.length) return;
 
-        const list = JSON.parse(listStr);
-        const toShow = list.slice(0, 20);
-        const remaining = list.slice(20);
+        const toShow = list.slice(0, 30);
+        const remaining = list.slice(30);
 
-        v.innerHTML += toShow.map((it, idx) => renderSingleCard(it, idx + 20)).join('');
+        v.innerHTML += toShow.map((it, idx) => renderSingleCard(it, idx + 50)).join('');
+        GroupCache[gid] = remaining;
 
         if (remaining.length) {
-            h.setAttribute('data-full-list', JSON.stringify(remaining));
             b.textContent = `加载更多... (${remaining.length})`;
-
-            // Auto-load on scroll near bottom
-            const observer = new IntersectionObserver((entries) => {
-                if (entries[0].isIntersecting) {
-                    observer.disconnect();
-                    toggleGroup(gid);
-                }
-            }, { rootMargin: '400px' });
-            observer.observe(b);
+            setupObserver(gid);
         } else {
-            h.style.display = 'none';
             b.style.display = 'none';
         }
     }
+}
+
+function setupObserver(gid) {
+    const btn = $(`${gid}-b`);
+    if (!btn) return;
+    const observer = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+            observer.disconnect();
+            toggleGroup(gid);
+        }
+    }, { rootMargin: '600px' });
+    observer.observe(btn);
 }
 
 function showSearch() {
