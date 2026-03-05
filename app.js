@@ -475,6 +475,10 @@ async function doSearch(keyword, mode = 'fuzzy') {
         fetchPromises.push(serverlessSearch(keyword));
         fetchPromises.push(searchByEngine(keyword));
 
+        // V26: Add more third-party aggregators
+        fetchPromises.push(fetchWithProxy(`https://www.dalipan.com/search?keyword=${encodeURIComponent(keyword)}`));
+        fetchPromises.push(fetchWithProxy(`https://www.wandou.la/search?keyword=${encodeURIComponent(keyword)}`));
+
         const responses = await Promise.all(fetchPromises);
         if (signal.aborted) return;
 
@@ -483,7 +487,7 @@ async function doSearch(keyword, mode = 'fuzzy') {
             if (!resp) return;
 
             // Handle Engine Search results (array of objects)
-            if (Array.isArray(resp) && resp.length > 0 && resp[0].source === '引擎搜索') {
+            if (Array.isArray(resp) && resp.length > 0 && (resp[0].source.includes('搜索'))) {
                 allRecords = allRecords.concat(resp);
                 return;
             }
@@ -635,12 +639,21 @@ async function serverlessSearch(kw) {
 }
 
 function parsePanSearchHtml(html) {
+    if (!html || typeof html !== 'string') return [];
     const items = [];
-    const driveRegex = /href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|www\.aliyundrive\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn|yun\.139\.com|cloud\.189\.cn|pan\.wo\.cn|115\.com|mypikpak\.com)\/s\/[a-zA-Z0-9_\-]+)"/gi;
+    // V26: Broadened regex to catch links in text, encoded attributes, etc.
+    const driveRegex = /(https?[:%][^"'\s<>]*?(pan\.quark\.cn|www\.alipan\.com|www\.aliyundrive\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn|yun\.139\.com|cloud\.189\.cn|pan\.wo\.cn|115\.com|mypikpak\.com)[^"'\s<>]*?\/s\/[a-zA-Z0-9_\-]+)/gi;
+
     let match;
     const seenUrls = new Set();
     while ((match = driveRegex.exec(html)) !== null) {
-        const url = match[1];
+        let url = match[1];
+        try {
+            url = decodeURIComponent(url);
+            if (url.includes('http') && url.lastIndexOf('http') > 0) url = url.substring(url.lastIndexOf('http'));
+        } catch (e) { }
+
+        if (!url.startsWith('http')) continue;
         if (seenUrls.has(url)) continue;
         const pos = match.index;
         const lookBack = html.substring(Math.max(0, pos - 600), pos);
@@ -954,17 +967,22 @@ function escAttr(s) { return String(s || '').replace(/'/g, "\\'").replace(/"/g, 
 
 // ─── External Engine Search (High Depth Coverage) ────────────────────────────
 async function searchByEngine(kw) {
-    const engines = [
-        { name: 'Bing', url: `https://www.bing.com/search?q=site:pan.quark.cn%20${encodeURIComponent(kw)}` },
-        { name: 'Bing', url: `https://www.bing.com/search?q=site:pan.baidu.com%20${encodeURIComponent(kw)}` },
-        { name: 'Baidu', url: `https://www.baidu.com/s?wd=site:pan.quark.cn%20${encodeURIComponent(kw)}` },
-        { name: 'Sogou', url: `https://www.sogou.com/web?query=site:pan.quark.cn%20${encodeURIComponent(kw)}` },
-        { name: 'Google', url: `https://www.google.com/search?q=site:pan.quark.cn%20${encodeURIComponent(kw)}` }
+    const dorks = [
+        // Pattern 1: Direct Site Search
+        `https://www.bing.com/search?q=site:pan.quark.cn%20${encodeURIComponent(kw)}`,
+        `https://www.bing.com/search?q=site:pan.baidu.com%20${encodeURIComponent(kw)}`,
+        // Pattern 2: Keyword + Link Prefix (Often bypasses strict indexing)
+        `https://www.bing.com/search?q=${encodeURIComponent(kw)}+"pan.quark.cn/s/"`,
+        `https://www.bing.com/search?q=${encodeURIComponent(kw)}+"pan.baidu.com/s/"`,
+        `https://www.bing.com/search?q=${encodeURIComponent(kw)}+"alipan.com/s/"`,
+        // Pattern 3: Third Party Aggregators
+        `https://www.bing.com/search?q=${encodeURIComponent(kw)}+"夸克网盘"+分享`,
+        `https://www.bing.com/search?q=${encodeURIComponent(kw)}+"百度网盘"+链接`
     ];
 
     const all = [];
-    const fetchPromises = engines.map(engine =>
-        fetchWithProxy(engine.url).then(html => ({ engine: engine.name, html })).catch(() => null)
+    const fetchPromises = dorks.map(url =>
+        fetchWithProxy(url).then(html => ({ source: 'Bing', html })).catch(() => null)
     );
 
     const responses = await Promise.all(fetchPromises);
@@ -972,12 +990,27 @@ async function searchByEngine(kw) {
     responses.forEach(res => {
         if (!res || !res.html || typeof res.html !== 'string') return;
         const html = res.html;
-        const driveRegex = /href="(https:\/\/(pan\.quark\.cn|www\.alipan\.com|www\.aliyundrive\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn|yun\.139\.com|cloud\.189\.cn|pan\.wo\.cn|115\.com|mypikpak\.com)\/s\/[a-zA-Z0-9_\-]+)"/gi;
+
+        // V26: Relaxed regex to find URLs even if encoded or hidden in redirects
+        // Note: We search for the pattern anywhere, then clean it
+        const driveRegex = /(https?[:%][^"'\s<>]*?(pan\.quark\.cn|www\.alipan\.com|www\.aliyundrive\.com|pan\.baidu\.com|pan\.xunlei\.com|drive\.uc\.cn|yun\.139\.com|cloud\.189\.cn|pan\.wo\.cn|115\.com|mypikpak\.com)[^"'\s<>]*?\/s\/[a-zA-Z0-9_\-]+)/gi;
 
         let match;
         const seenInThisEngine = new Set();
         while ((match = driveRegex.exec(html)) !== null) {
-            const url = match[1];
+            let url = match[1];
+
+            // Clean/Decode URL (Handle %3A, %2F, and search engine wrappers)
+            try {
+                url = decodeURIComponent(url);
+                // If it's a redirect wrapper, try to extract the inner link
+                if (url.includes('http') && url.lastIndexOf('http') > 0) {
+                    url = url.substring(url.lastIndexOf('http'));
+                }
+            } catch (e) { }
+
+            // Normalize and validate
+            if (!url.startsWith('http')) continue;
             if (seenInThisEngine.has(url)) continue;
 
             // Extract title from snippet or nearby text
@@ -985,7 +1018,6 @@ async function searchByEngine(kw) {
             const lookBack = html.substring(Math.max(0, pos - 300), pos);
             const lookForward = html.substring(pos, Math.min(html.length, pos + 200));
 
-            // Try to find the title in the nearest <a> tag or <h3> tag (common in search engines)
             const titleMatch = lookBack.match(/>([^<]{2,60})<\/a>/i) ||
                 lookBack.match(/<h3[^>]*>(.*?)<\/h3>/i) ||
                 lookForward.match(/title="([^"]+)"/i);
@@ -997,7 +1029,7 @@ async function searchByEngine(kw) {
                 note: title || kw,
                 url: url,
                 datetime: new Date().toISOString(),
-                source: `${res.engine}搜索`
+                source: `深度引擎搜索`
             });
             seenInThisEngine.add(url);
         }
