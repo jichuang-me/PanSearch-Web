@@ -27,10 +27,10 @@ const DRIVE_DOMAINS = ['quark.cn', 'pan.baidu.com', 'alipan.com', 'aliyundrive.c
 // Simple Alias & Pinyin Mapping for fuzzier broad search
 const KEYWORD_ALIASES = {
     '黑神话悟空': ['heishenhua', 'wukong', '黑马', 'blackmyth', 'black myth'],
-    '三体': ['santi', '3body', 'three body'],
-    '甄嬛传': ['zhenhuan', 'zhz'],
-    '权力的游戏': ['got', 'game of thrones', '权游'],
-    '流浪地球': ['diqiu', 'wandering earth'],
+    '三体': ['santi', '3body', 'three body', '三体1', '三体2', '三体3'],
+    '甄嬛传': ['zhenhuan', 'zhz', '甄嬛', '后宫甄嬛传', '后宫', '甄环传'],
+    '权力的游戏': ['got', 'game of thrones', '权游', '冰与火之歌'],
+    '流浪地球': ['diqiu', 'wandering earth', '流浪地球2', '小破球'],
 };
 
 // ─── State ────────────────────────────────────────────────────────────────────
@@ -521,8 +521,14 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
             // Layer 2: Query Expansion Checks
             const matchesAll = kws.length > 0 && kws.every(k => note.includes(k));
-            const matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
+            let matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
             const matchesAlias = aliases.some(a => note.includes(a));
+
+            // V22: Smarter Fuzzy matching for short Chinese strings (e.g. "甄嬛传" -> match "甄嬛")
+            if (!matchesAny && !isPrecise && kwLower.length >= 3 && /^[\u4e00-\u9fa5]+$/.test(kwLower)) {
+                const sub = kwLower.substring(0, 2); // Take first 2 chars
+                if (note.includes(sub)) matchesAny = true;
+            }
 
             // --- Scoring & Filtering Protocol ---
             let score = 0;
