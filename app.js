@@ -162,8 +162,14 @@ const SuggestionManager = {
     render(list) {
         const dropdown = $('suggestion-dropdown'), listEl = $('suggestion-list');
         if (!dropdown || !listEl) return;
-        if (!list.length) { dropdown.style.display = 'none'; return; }
-        listEl.innerHTML = list.map(k => `
+
+        // Filter out irrelevant search suggestions (questions, online watching, etc.) to keep it resource-focused
+        const badPatterns = /(是什么|怎么|哪里|为什么|在线看|在线观看|的拼音|的意思|读音)/;
+        const filteredList = list.filter(k => !badPatterns.test(k)).slice(0, 8);
+
+        if (!filteredList.length) { dropdown.style.display = 'none'; return; }
+
+        listEl.innerHTML = filteredList.map(k => `
             <div class="suggestion-item" onclick="doSearch('${escAttr(k)}')">
                 <svg class="suggestion-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
                 <span class="text">${escHtml(k)}</span>
