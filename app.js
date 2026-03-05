@@ -427,24 +427,43 @@ function showResults() {
 
 function setSearchLoading(on) {
     if ($('search-btn')) $('search-btn').disabled = on;
-    const discovery = $('discovery');
+    const discovery = $('discovery-area'); // FIXED ID
     const header = $('hero-header');
     if (on) {
         if (discovery) discovery.style.display = 'none';
         if (header) header.classList.add('collapsed');
+        $('results-grid').innerHTML = `<div class="loading-state" style="margin-top:24px"><div class="loading-spinner"></div><p>正在智能抓取全网高质量资源...</p></div>`;
+    } else {
+        if (discovery && !$('search-input').value.trim()) discovery.style.display = 'block';
     }
-    if (on) $('results-grid').innerHTML = `<div class="loading-state" style="margin-top:24px"><div class="loading-spinner"></div><p>正在智能抓取全网高质量资源...</p></div>`;
 }
 
 async function fetchWithProxy(url) {
+    const fetchWithTimeout = async (target, timeout = 5000) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        try {
+            const res = await fetch(target, { signal: controller.signal });
+            clearTimeout(id);
+            return res;
+        } catch (e) { return null; }
+    };
+
+    // Try AllOrigins (Fastest usually if it works)
     try {
-        const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`);
-        if (res.ok) { const j = await res.json(); return j.contents; }
+        const res = await fetchWithTimeout(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}&_=${Date.now()}`, 4000);
+        if (res && res.ok) {
+            const j = await res.json();
+            if (j.contents) return j.contents;
+        }
     } catch (e) { }
+
+    // Fallback to CorsProxy
     try {
-        const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-        return res.ok ? await res.text() : null;
+        const res = await fetchWithTimeout(`https://corsproxy.io/?${encodeURIComponent(url)}`, 5000);
+        if (res && res.ok) return await res.text();
     } catch (e) { }
+
     return null;
 }
 

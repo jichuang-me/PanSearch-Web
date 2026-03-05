@@ -454,10 +454,11 @@ h1 {
 .disc-col-inline {
     display: flex;
     align-items: center;
-    padding: 6px 0;
-    /* Tightened spacing */
+    padding: 4px 0;
+    /* Extra tight */
     width: 100%;
     overflow: hidden;
+    gap: 8px;
 }
 
 .disc-col-inline:last-child {
@@ -1006,10 +1007,11 @@ h1 {
 }
 
 .loading-spinner.mini {
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     border-width: 2px;
-    margin: 20px auto;
+    margin: 4px 10px;
+    /* Reduced from 20px */
 }
 
 @keyframes fade-in {
