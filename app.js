@@ -519,6 +519,10 @@ async function doSearch(keyword, mode = 'fuzzy') {
             const note = (item.title || item.note || '').toLowerCase();
             const isGeneric = note === "未知资源" || note === "";
 
+            // --- Scoring & Filtering Protocol ---
+            let score = 0;
+            const isPrecise = mode === 'precise';
+
             // Layer 2: Query Expansion Checks
             const matchesAll = kws.length > 0 && kws.every(k => note.includes(k));
             let matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
@@ -529,10 +533,6 @@ async function doSearch(keyword, mode = 'fuzzy') {
                 const sub = kwLower.substring(0, 2); // Take first 2 chars
                 if (note.includes(sub)) matchesAny = true;
             }
-
-            // --- Scoring & Filtering Protocol ---
-            let score = 0;
-            const isPrecise = mode === 'precise';
 
             // Standard Fuzzy Rule: Enforce overlap for search keywords
             if (!matchesAny && !matchesAlias && !isGeneric) return;
