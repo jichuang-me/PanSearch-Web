@@ -377,57 +377,73 @@ async function doSearch(keyword, mode = 'fuzzy') {
             }
         });
 
-        // V16: Precision Multi-Stage Filter & Scorer
+        // --- V20: Advanced Search Matching & Scoring Protocol ---
         const uniqueResults = [];
         const seenUrls = new Set();
         const kwLower = keyword.toLowerCase();
         const kws = kwLower.split(/\s+/).filter(Boolean);
         const aliases = KEYWORD_ALIASES[keyword] || [];
 
-        allRecords.forEach(item => {
-            if (!item.url || seenUrls.has(item.url)) return;
+        // Pre-compute query characteristics
+        const queryHasEnglish = /[a-z]/.test(kwLower);
 
-            // Hard Filter: Must be a valid cloud drive link
+        allRecords.forEach(item => {
+            // Layer 1: Hard Filter (Deduplication & Valid Drive Link Only)
+            if (!item.url || seenUrls.has(item.url)) return;
             const isDriveLink = DRIVE_DOMAINS.some(domain => item.url.includes(domain));
             if (!isDriveLink) return;
 
             const note = (item.title || item.note || '').toLowerCase();
-
-            // Stage 1: smart relevance check (multi-keyword + alias)
             const isGeneric = note === "未知资源" || note === "";
-            // Perfect match: every keyword fragment is found in the title
+
+            // Layer 2: Query Expansion Checks
             const matchesAll = kws.length > 0 && kws.every(k => note.includes(k));
-            // Partial match: at least one keyword fragment is found
             const matchesAny = kws.some(k => note.includes(k)) || kwLower.includes(note) || note.includes(kwLower);
             const matchesAlias = aliases.some(a => note.includes(a));
 
-            // Stage 2: Quality/Recency Scoring
+            // Layer 3 & 4: Scoring & Penalty System
             let score = 0;
 
-            // If the keyword is completely absent from the title, it might be a semantic match from the API 
-            // (or it might be total garbage). We don't drop it outright anymore, but we score it very low (0 or negative)
-            // so that if there are actual good matches, they float to the top.
-            if (!isGeneric && !matchesAny && !matchesAlias) {
-                score = -50;
+            if (isGeneric) {
+                // Keep generic titles but rank them low
+                score = -80;
+            } else if (!matchesAny && !matchesAlias) {
+                // Zero keyword overlap (fuzzy match from backend)
+                score = -100;
             } else {
-                if (matchesAll) score += 20; // Boost perfect matches
-                if (note === kwLower) score += 50; // Exact title match
-                if (note.startsWith(kwLower)) score += 30;
+                // Positive Scoring
+                if (note === kwLower) score += 100; // Perfect exact mirror title
+                if (matchesAll) score += 60; // Every word fragment is in the title
+                if (note.startsWith(kwLower)) score += 40; // Starts with it
+                if (matchesAny && !matchesAll) score += 20; // At least one word fragment is present
+                if (matchesAlias) score += 30; // Matches known alias/pinyin
             }
 
-            if (item.driveType === 'quark') score += 10; // User preferred platform
+            // Language Characteristic Penalty (e.g., query "sss" but result "甄嬛传")
+            const resultHasEnglish = /[a-z]/.test(note);
+            if (queryHasEnglish && !resultHasEnglish) {
+                score -= 300; // Drastic penalty for language mismatch on english queries
+            }
 
-            // Recency weighting
+            // Quality/Metadata Boosting
+            if (note.includes('4k') || note.includes('2160p')) score += 40;
+            if (note.includes('1080p') || note.includes('1080')) score += 20;
+            if (note.includes('全集') || note.includes('合集') || note.includes('完整版')) score += 30;
+            if (note.includes('蓝光') || note.includes('bd')) score += 20;
+
+            // Preferred Platform Boosting
+            if (item.driveType === 'quark') score += 25;
+            if (item.driveType === 'aliyun') score += 20;
+
+            // Recency Weighting
             if (item.datetime) {
-                const dt = new Date(item.datetime);
-                if (!isNaN(dt.getTime())) {
-                    const daysOld = (new Date() - dt) / (1000 * 3600 * 24);
-                    if (daysOld < 7) score += 30; // Very fresh (latest)
-                    else if (daysOld < 30) score += 15;
-                    else if (daysOld > 365) score -= 10; // Penalize old resources slightly
-                }
+                const ageDays = (Date.now() - new Date(item.datetime).getTime()) / (1000 * 3600 * 24);
+                if (ageDays <= 3) score += 30;
+                else if (ageDays <= 30) score += 10;
+                else if (ageDays > 365) score -= 10; // Penalize very old links slightly
             }
 
+            // Save and Push
             item.score = score;
             uniqueResults.push(item);
             seenUrls.add(item.url);
