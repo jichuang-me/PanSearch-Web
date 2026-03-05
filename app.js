@@ -147,7 +147,7 @@ const HistoryManager = {
 function bindEvents() {
     const handleS = (mode) => {
         const vr = $('view-results');
-        const input = (vr && vr.classList.contains('active') ? $('results-input') : $('search-input'));
+        const input = (vr && vr.classList.contains('active')) ? $('results-input') : $('search-input');
         const val = input.value.trim();
         if (val) doSearch(val, mode);
     };
@@ -230,7 +230,12 @@ async function doSearch(keyword, mode = 'fuzzy') {
 
     HistoryManager.add(keyword);
     HistoryManager.hide();
-    showResults();
+
+    const vr = $('view-results');
+    if (!vr.classList.contains('active')) {
+        showResults();
+    }
+
     setSearchLoading(true);
 
     try {

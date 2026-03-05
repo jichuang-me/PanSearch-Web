@@ -153,51 +153,36 @@ h1 {
     /* Space for buttons */
 }
 
-.search-btn-group {
+.search-btn-minimal {
     display: flex;
-    align-items: stretch;
-    background: linear-gradient(135deg, var(--primary), var(--primary-2));
-    border-radius: 100px;
-    box-shadow: 0 4px 15px rgba(129, 140, 248, 0.2);
-    margin: 4px;
-    min-width: fit-content;
+    align-items: center;
+    background: transparent;
+    padding-right: 8px;
 }
 
-.search-btn-group button {
+.search-btn-minimal button {
     background: transparent;
-    color: white;
+    color: var(--primary);
     border: none;
     font-size: 0.9rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background 0.2s;
-    letter-spacing: 0.5px;
+    transition: color 0.2s, background 0.2s;
+    padding: 6px 12px;
+    border-radius: 100px;
+    white-space: nowrap;
 }
 
-.search-btn-group button:hover {
-    background: rgba(255, 255, 255, 0.15);
+.search-btn-minimal button:hover {
+    background: rgba(129, 140, 248, 0.1);
+    color: var(--primary-2);
 }
 
-.search-btn-group button:active {
-    background: rgba(255, 255, 255, 0.25);
-}
-
-.btn-group-left {
-    padding: 0 16px 0 20px;
-    border-top-left-radius: 100px;
-    border-bottom-left-radius: 100px;
-}
-
-.btn-group-right {
-    padding: 0 20px 0 16px;
-    border-top-right-radius: 100px;
-    border-bottom-right-radius: 100px;
-}
-
-.btn-divider {
+.btn-sep {
     width: 1px;
-    background: rgba(255, 255, 255, 0.3);
-    margin: 8px 0;
+    height: 14px;
+    background: var(--border);
+    margin: 0 4px;
 }
 
 .search-bar input {
@@ -301,7 +286,8 @@ h1 {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
     overflow: hidden;
     z-index: 1000;
-    padding: 10px 0;
+    padding: 16px 16px 40px 16px;
+    /* space at bottom for trash icon */
     animation: fade-down 0.2s var(--ease);
 }
 
@@ -352,6 +338,27 @@ h1 {
     padding: 0 16px 8px;
     max-height: 200px;
     overflow-y: auto;
+}
+
+.btn-icon-trash {
+    position: absolute;
+    bottom: 12px;
+    right: 16px;
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-icon-trash:hover {
+    color: var(--danger);
+    background: rgba(239, 68, 68, 0.1);
 }
 
 .history-tag-item {
@@ -447,16 +454,16 @@ h1 {
 /* ===== DISCOVERY ===== */
 .discovery-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
+    /* Align right since h2 is gone */
     align-items: center;
     max-width: 1200px;
     margin: 40px auto 16px;
 }
 
-.discovery-header h2 {
-    font-size: 1rem;
-    font-weight: 700;
-    color: var(--muted);
+.discovery-header.minimal {
+    margin-top: 16px;
+    /* give some reduced breathing room */
 }
 
 .refresh-link {
@@ -532,33 +539,29 @@ h1 {
     padding-bottom: 12px;
 }
 
-/* Live badge */
-.live {
-    background: var(--success);
-    color: #fff;
-    font-size: .6rem;
-    font-weight: 700;
-    padding: 2px 5px;
-    border-radius: 4px;
-    letter-spacing: .5px;
-    animation: pulse-live 2s infinite;
+/* Hot tags */
+.hot-search-box.inline-flex {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
 }
 
-@keyframes pulse-live {
+.hot-search-box.inline-flex::-webkit-scrollbar {
+    display: none;
+}
 
-    0%,
-    100% {
-        opacity: 1;
-    }
-
-    50% {
-        opacity: .6;
-    }
+.hot-title {
+    flex-shrink: 0;
+    margin-bottom: 0 !important;
+    margin-right: 8px;
 }
 
 .hot-tags {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 12px;
 }
 
