@@ -357,6 +357,21 @@ h1 {
     color: #fff;
 }
 
+.tag-count {
+    margin-left: 6px;
+    padding: 1px 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    opacity: 0.8;
+}
+
+.tag.active .tag-count {
+    background: rgba(255, 255, 255, 0.25);
+    opacity: 1;
+}
+
 /* ===== HISTORY DROPDOWN ===== */
 .history-dropdown {
     position: absolute;

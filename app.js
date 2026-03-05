@@ -638,11 +638,28 @@ function renderCards(list) {
 
     const grid = $('results-grid');
     if (!grid) return;
-    const infoEl = $('result-info');
-    if (infoEl) infoEl.textContent = filtered.length ? `为你展示 ${filtered.length} 条资源` : '未发现匹配资源';
 
-    if (!filtered.length) {
-        grid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>${isPrecise ? '精确模式下未匹配到结果，可尝试关闭有效性筛选' : '换个关键词试试？'}</p></div>`;
+    // Calculate Stats
+    const totalCount = filtered.length;
+    const driveCounts = { 'all': list.length };
+    list.forEach(it => {
+        const t = it.driveType || 'other';
+        driveCounts[t] = (driveCounts[t] || 0) + 1;
+    });
+
+    // Update Filter Tags with Counts
+    document.querySelectorAll('#main-filter .tag').forEach(tag => {
+        const type = tag.dataset.type;
+        const baseName = DRIVE_NAMES[type] || (type === 'all' ? '全部' : '其他');
+        const count = driveCounts[type] || 0;
+        tag.innerHTML = `${baseName} <span class="tag-count">${count}</span>`;
+    });
+
+    const infoEl = $('result-info');
+    if (infoEl) infoEl.textContent = totalCount ? `为你展示 ${totalCount} 条资源` : '未发现匹配资源';
+
+    if (!totalCount) {
+        grid.innerHTML = `<div class="empty-state"><div class="emoji">🌫️</div><p>${isPrecise ? '精确模式下未匹配到结果，可尝试关闭精确筛选' : '换个关键词试试？'}</p></div>`;
         return;
     }
     const groups = {};
